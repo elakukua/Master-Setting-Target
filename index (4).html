@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIM+ AP Target Setting — Decision Workbook · FY27–30 · PEARL WVI</title>
+<meta name="description" content="Area Programme target setting decision workbook for the AIM+ cycle FY27–FY30. PEARL, Wahana Visi Indonesia.">
+<meta name="color-scheme" content="light">
+<link rel="stylesheet" href="assets/app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23111222'/%3E%3Crect x='5' y='22' width='5' height='5' fill='%23FF5515'/%3E%3Crect x='13' y='15' width='5' height='12' fill='%23FF5515'/%3E%3Crect x='21' y='7' width='5' height='20' fill='%23155930'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<!-- ========================= WORKBOOK CHROME ========================= -->
+<div class="chrome noprint">
+  <div class="chrome-in">
+    <div class="filename">
+      <b>WVI_AIMplus_TargetSetting_Decision_Workbook_FY27-30</b><span class="ext">&nbsp;· static site</span>
+    </div>
+    <span class="chip" id="dataChip">loading…</span>
+    <div class="chrome-sp"></div>
+    <span class="lockstate">🔒 Reports read-only · sheets 00 and 06 accept input</span>
+    <button class="cbtn" id="btnMaster" title="Edit the data, the AP register and the outcome map">✎ Master setup</button>
+    <button class="cbtn" id="btnRefresh" title="Rebuilds every derived column, chart and card">↻ Rebuild</button>
+    <button class="cbtn" id="btnImport">⤓ Import submissions</button>
+    <button class="cbtn" id="btnExport">⤒ Export</button>
+    <button class="cbtn" id="btnPrint">⎙ Print</button>
+  </div>
+</div>
+
+<!-- ========================= SHEETS ========================= -->
+<div class="sheetwrap" id="sheets"></div>
+
+<!-- ========================= SHEET TABS ========================= -->
+<div class="tabbar noprint"><div class="tabbar-in" id="tabbar"></div></div>
+
+<!-- ========================= MODALS ========================= -->
+<div class="scrim" id="scrimImport">
+  <div class="modal">
+    <h3>Import submissions <button data-close>✕</button></h3>
+    <div class="body">
+      <p>Select the submission block in Excel (<b>without</b> the header row), copy, and paste below.
+         Tab-separated, 16 columns, in this order — the same order as <span class="keyprev">tblMaster</span> §2.1:</p>
+      <div class="colspec">Zonal ⇥ AP ⇥ AP_ID ⇥ Outcome ⇥ Code ⇥ Indicator ⇥ Num_Base ⇥ Den_Base ⇥ Pct_Base ⇥ Num_LOP ⇥ Den_LOP ⇥ Pct_LOP ⇥ Delta ⇥ AP_Proposal ⇥ Threshold ⇥ AP_vs_Threshold</div>
+      <p class="dim">Proportions may be written as <span class="keyprev">0.235</span> or <span class="keyprev">23.5%</span> — both are read as 23.5%.
+         An empty cell stays empty; it is never read as zero. Text is trimmed and cleaned.
+         An AP that is not yet on the register is added to it automatically with all five outcomes on.</p>
+      <textarea id="pasteBox" placeholder="Paste here…" spellcheck="false"></textarea>
+      <p id="pasteMsg" class="vmsg" style="display:none"></p>
+    </div>
+    <div class="foot">
+      <button class="gobtn" id="btnDoImport">Load into tblMaster</button>
+      <button class="ghost" data-close>Cancel</button>
+      <span class="appendonly">Import replaces the data and clears the decision log. Export the log first if you need it.</span>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrimExport">
+  <div class="modal">
+    <h3>Export <button data-close>✕</button></h3>
+    <div class="body">
+      <p>CSV opens directly in Excel. To change what this site <i>publishes</i>, use
+         <b>Master setup → Save &amp; publish</b> instead: those downloads are the data files themselves.</p>
+      <div class="fgrid">
+        <div class="fg"><button class="ghost" id="expDec" style="width:100%">Decision log (CSV)</button>
+          <div class="hlp">All revisions, in append order</div></div>
+        <div class="fg"><button class="ghost" id="expCorr" style="width:100%">Correction list (CSV)</button>
+          <div class="hlp">Every flagged row, for the APs to fix</div></div>
+        <div class="fg"><button class="ghost" id="expMaster" style="width:100%">tblMaster (CSV)</button>
+          <div class="hlp">All 40 columns, derived fields included</div></div>
+        <div class="fg"><button class="ghost" id="expJson" style="width:100%">Workbook state (JSON)</button>
+          <div class="hlp">Data plus decisions, one file</div></div>
+      </div>
+    </div>
+    <div class="foot"><button class="ghost" data-close>Close</button>
+      <span class="appendonly">Files download to your machine. Nothing is sent anywhere.</span></div>
+  </div>
+</div>
+
+<div class="scrim" id="scrimLocked">
+  <div class="modal" style="max-width:520px">
+    <h3>Sheet is hidden <button data-close>✕</button></h3>
+    <div class="body">
+      <p><span id="lockedName" class="keyprev"></span> is a data sheet, hidden in the Excel build and held in
+         <span class="keyprev">/data</span> here.</p>
+      <p class="dim">Everything on it is already rendered on sheets 01–08. To change it, use
+         <b>00_MASTER</b> — that is the same content with guard rails, and it can write the file back out for you.</p>
+    </div>
+    <div class="foot">
+      <button class="ghost" data-close>Understood</button>
+      <button class="gobtn" onclick="document.getElementById('scrimLocked').classList.remove('on');go('00_MASTER')">Open Master setup</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ========================= DATA ========================= -->
+<script src="data/ap-register.js"></script>
+<script src="data/indicators.js"></script>
+<script src="data/master.js"></script>
+<script src="data/decisions.js"></script>
+<!-- ========================= APP ========================= -->
+<script src="assets/app.js"></script>
+</body>
+</html>
