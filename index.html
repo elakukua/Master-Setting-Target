@@ -6,7 +6,10 @@
 <title>AIM+ AP Target Setting — Decision Workbook · FY27–30 · PEARL WVI</title>
 <meta name="description" content="Area Programme target setting decision workbook for the AIM+ cycle FY27–FY30. PEARL, Wahana Visi Indonesia.">
 <meta name="color-scheme" content="light">
-<link rel="stylesheet" href="assets/app.css">
+
+<!-- FLAT LAYOUT: every file sits next to this one, in the repository root.
+     app.css · app.js · ap-register.js · indicators.js · master.js · decisions.js -->
+<link rel="stylesheet" href="app.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23111222'/%3E%3Crect x='5' y='22' width='5' height='5' fill='%23FF5515'/%3E%3Crect x='13' y='15' width='5' height='12' fill='%23FF5515'/%3E%3Crect x='21' y='7' width='5' height='20' fill='%23155930'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -83,7 +86,7 @@
     <h3>Sheet is hidden <button data-close>✕</button></h3>
     <div class="body">
       <p><span id="lockedName" class="keyprev"></span> is a data sheet, hidden in the Excel build and held in
-         <span class="keyprev">/data</span> here.</p>
+         the data files next to this page.</p>
       <p class="dim">Everything on it is already rendered on sheets 01–08. To change it, use
          <b>00_MASTER</b> — that is the same content with guard rails, and it can write the file back out for you.</p>
     </div>
@@ -96,12 +99,12 @@
 
 <div class="toast" id="toast"></div>
 
-<!-- ========================= DATA ========================= -->
-<script src="data/ap-register.js"></script>
-<script src="data/indicators.js"></script>
-<script src="data/master.js"></script>
-<script src="data/decisions.js"></script>
+<!-- ========================= DATA (must load before the app) ========================= -->
+<script src="ap-register.js"></script>
+<script src="indicators.js"></script>
+<script src="master.js"></script>
+<script src="decisions.js"></script>
 <!-- ========================= APP ========================= -->
-<script src="assets/app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
