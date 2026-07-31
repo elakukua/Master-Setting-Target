@@ -144,20 +144,42 @@ a:hover{text-decoration:underline}
 .card.teal{border-left-color:var(--teal)}      .card.teal .val{color:var(--teal)}
 
 /* ============================================================
-   STATUS PILLS — colour + icon, greyscale-safe (§7.3)
+   STATUS — kosakata Indonesia (§3). Warna + ikon, aman cetak BW.
    ============================================================ */
 .pill{
   display:inline-flex;align-items:center;gap:5px;
-  font-size:10px;font-weight:700;letter-spacing:.04em;
-  padding:2px 7px 2px 6px;border-radius:2px;white-space:nowrap;
-  border:1px solid transparent;
+  font-size:10px;font-weight:700;letter-spacing:.02em;
+  padding:2px 7px 2px 6px;border-radius:2px;white-space:nowrap;border:1px solid transparent;
 }
 .pill .ic{font-size:9px;line-height:1}
-.p-READY{background:var(--f-ready);color:var(--green);border-color:#C4DBCE}
-.p-NEEDSREVIEW{background:var(--f-review);color:var(--amber);border-color:#E8D89A}
-.p-MONITOR{background:var(--f-monitor);color:var(--burnt);border-color:#F0C9B6}
-.p-CRITICAL{background:var(--f-critical);color:var(--red);border-color:#EFC2CD}
-.p-REFERENCE{background:var(--f-reference);color:var(--grey);border-color:var(--rule)}
+.s-baik  {background:#E8F1EC;color:#155930;border-color:#C4DBCE}
+.s-tinjau{background:#FFF4CE;color:#6B4E00;border-color:#E8D89A}
+.s-hati  {background:#FDE7EB;color:#B10831;border-color:#EFC2CD}
+.s-belum {background:#F3F2F0;color:#3F3D4C;border-color:var(--rule)}
+
+.ichip{
+  display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;
+  letter-spacing:.05em;padding:2px 7px;border-radius:2px;margin-right:6px;white-space:nowrap;
+}
+.ichip.ok{background:#E8F1EC;color:#155930;border:1px solid #C4DBCE}
+.ichip.no{background:#FDE7EB;color:#B10831;border:1px solid #EFC2CD}
+
+.cfgflag{
+  font-size:9.5px;font-weight:700;letter-spacing:.05em;color:var(--grey);
+  background:var(--f-reference);border:1px solid var(--rule);padding:4px 9px;border-radius:2px;
+}
+.legendrow{
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px;
+  border:1px solid var(--rule);background:#FCFBFA;padding:8px 12px;font-size:10.5px;
+}
+.legendrow .lbl{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--grey);margin-right:4px}
+.legendrow .ldesc{color:#8A8894;margin-right:12px}
+.warnbox{
+  border:1px solid #EFC2CD;border-left:4px solid var(--red);background:var(--f-critical);
+  padding:11px 14px;font-size:11.5px;color:#7E0A23;line-height:1.55;
+}
+.chartnote{margin:8px 0 0;font-size:10px;font-style:italic;color:var(--amber);line-height:1.5}
+.morebar{margin-top:10px;text-align:center}
 
 /* ============================================================
    TABLES — gridlines off, thin rules, CF-driven fills
@@ -536,3 +558,46 @@ button.tiny.warn:hover{background:var(--f-critical)}
   .chartbox,.panel,.insights,.legendbox,.tscroll{break-inside:avoid}
   a{color:#000;text-decoration:none}
 }
+
+/* ============================================================
+   v2 — tabel padat, matriks pemetaan, penanda nilai
+   ============================================================ */
+table.gt.tight thead th{padding:5px 6px;font-size:8.5px}
+table.gt.tight tbody td{padding:3px 6px;font-size:10.5px}
+table.gt th.sorted{color:var(--orange)}
+table.gt th[data-sort]{cursor:pointer;user-select:none}
+table.gt th[data-sort]:hover{color:var(--orange)}
+td.ind{max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td.belumcell{background:var(--f-reference);color:#8A8894;text-align:right}
+td.moncell{background:var(--f-monitor);color:var(--burnt);font-weight:600}
+td.nocell{background:var(--f-reference);color:var(--grey);font-style:italic}
+td.up{color:var(--green);font-weight:600}
+td.down{color:var(--red);font-weight:600}
+td.wrongway,.wrongway{color:var(--red);font-weight:700;background:#FDE7EB}
+td.naik,.naik{color:var(--teal)}
+td.turun,.turun{color:var(--burnt);font-weight:600}
+tbody tr.oos td{background:var(--f-reference)!important;font-style:italic;color:#7C7A86}
+tbody tr.grp td{border-top:1px solid var(--grey)}
+.card.belum{border-left-color:#A9A6B0}.card.belum .val{color:#6F6D7A}
+
+table.gt.matrix th.vert{height:96px;vertical-align:bottom;padding:0 2px 6px}
+table.gt.matrix th.vert span{
+  writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;
+  font-size:9px;letter-spacing:.04em;display:inline-block;
+}
+table.gt.matrix .sticky{
+  position:sticky;left:0;background:var(--paper);z-index:2;
+  max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  box-shadow:1px 0 0 var(--rule);
+}
+table.gt.matrix tbody tr:nth-child(even) .sticky{background:var(--band)}
+table.gt.matrix tfoot .sticky{background:var(--f-reference)}
+button.yn{
+  border:1px solid var(--rule);background:var(--paper);cursor:pointer;border-radius:2px;
+  font-size:9px;font-weight:700;padding:2px 6px;min-width:34px;
+}
+button.yn.y{background:#E8F1EC;border-color:#9EC6AE;color:#155930}
+button.yn.n{background:var(--f-reference);border-color:var(--rule);color:#A9A6B0}
+button.yn:hover{border-color:var(--orange);color:var(--orange)}
+select.cell.wide{max-width:400px}
+.slicer .items{max-height:132px;overflow-y:auto}
