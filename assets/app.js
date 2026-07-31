@@ -211,6 +211,24 @@ function recompute(){
       : r.Dec_Status==="Approved" ? "READY"
       : "NEEDS REVIEW";
 
+    /* ---- trend metrics · direction-safe, comparable across indicators ----
+       dist  = percentage points still short of the threshold (0 = threshold met)
+       close = share of the baseline-to-threshold gap the proposed target closes  */
+    const dir=(IND[r.Code]||{}).dir||1;
+    r.Dir=dir; r.Dist_Base=null; r.Dist_Target=null; r.Closure=null; r.Meets=null; r.Uplift=null;
+    if(!isBlank(r.Pct_Base)&&!isBlank(r.Threshold)&&r.Chk_Range===0){
+      r.Dist_Base=Math.max(0,dir*(r.Threshold-r.Pct_Base))*100;
+      if(!isBlank(r.Pct_LOP)){
+        r.Dist_Target=Math.max(0,dir*(r.Threshold-r.Pct_LOP))*100;
+        r.Uplift=dir*(r.Pct_LOP-r.Pct_Base)*100;
+        r.Meets = dir===1 ? r.Pct_LOP>=r.Threshold : r.Pct_LOP<=r.Threshold;
+        const gap=dir*(r.Threshold-r.Pct_Base), move=dir*(r.Pct_LOP-r.Pct_Base);
+        /* a gap under one percentage point makes the ratio meaningless, and the ratio is
+           capped at 200% so a single near-threshold row cannot distort a comparison */
+        r.Closure = gap>0.01 ? Math.max(-1,Math.min(2,move/gap)) : (r.Meets?1:0);
+      }
+    }
+
     r.Stage = r.Dec_Status==="Approved"?7 : r.Dec_Status==="Revision Requested"?6
       : r.Dec_Status==="Reviewed"?5 : r.Dec_Status==="Discussed"?4
       : r.Chk_Proposal===0?3 : r.Chk_Threshold===0?2 : 1;
@@ -348,6 +366,96 @@ function chartFlags(items){
   return s+'</svg>';
 }
 
+/* data bar with a capped fill and an uncapped label */
+function barCap(v){
+  if(v==null) return '<span class="dim">—</span>';
+  const p=Math.max(0,Math.min(1,v));
+  return '<div class="bar"><i style="width:'+(p*100).toFixed(1)+'%"></i>'+
+         '<span>'+Math.round(v*100)+'%</span></div>';
+}
+
+/* median, and the medians the trend views need */
+function med(a){const b=a.filter(v=>v!=null&&isFinite(v)).sort((x,y)=>x-y);
+  if(!b.length)return null; const m=b.length>>1;
+  return b.length%2?b[m]:(b[m-1]+b[m])/2;}
+function trendOf(rows){
+  const withThr=rows.filter(r=>r.Dist_Base!=null);
+  const withTgt=rows.filter(r=>r.Dist_Target!=null);
+  return {
+    n:rows.length,
+    measured:withTgt.length,
+    distBase:med(withThr.map(r=>r.Dist_Base)),
+    distTarget:med(withTgt.map(r=>r.Dist_Target)),
+    closure:med(withTgt.map(r=>r.Closure)),
+    uplift:med(withTgt.map(r=>r.Uplift)),
+    meets:withTgt.filter(r=>r.Meets).length,
+    approved:rows.filter(r=>r.Stage===7).length
+  };
+}
+
+/* dumbbell — distance to threshold, baseline vs proposed target.
+   0 on the left means the threshold is reached. Movement runs right to left. */
+function chartDumbbell(items,labW){
+  labW=labW||140;
+  const W=700,PITCH=26,H=items.length*PITCH+34,PW=W-labW-64;
+  const max=Math.max(5,...items.map(i=>Math.max(i.a||0,i.b||0)));
+  const x=v=>labW+PW*(1-Math.min(1,(v||0)/max));
+  let s='<svg viewBox="0 0 '+W+' '+H+'" role="img">';
+  /* axis */
+  for(let g=0;g<=4;g++){
+    const v=max*g/4, px=x(v);
+    s+='<line x1="'+px.toFixed(1)+'" y1="18" x2="'+px.toFixed(1)+'" y2="'+(H-16)+'" stroke="'+(g===0?"#155930":"#EDEBE6")+'"'+(g===0?' stroke-width="1.5"':'')+'/>'+
+       '<text x="'+px.toFixed(1)+'" y="12" text-anchor="middle" font-size="8.5" fill="'+(g===0?"#155930":"#A9A6B0")+'">'+
+       (g===0?"threshold":v.toFixed(0)+"pp")+'</text>';
+  }
+  items.forEach((it,i)=>{
+    const y=26+i*PITCH;
+    s+='<text x="'+(labW-9)+'" y="'+(y+4)+'" text-anchor="end" font-size="10.5" font-weight="600" fill="#111222">'+esc(it.label)+'</text>';
+    if(it.a==null||it.b==null){
+      s+='<text x="'+labW+'" y="'+(y+4)+'" font-size="9" fill="#A9A6B0">no threshold on record</text>';
+    }else{
+      const xa=x(it.a), xb=x(it.b);
+      s+='<line x1="'+xa.toFixed(1)+'" y1="'+y+'" x2="'+xb.toFixed(1)+'" y2="'+y+'" stroke="#C9C6CE" stroke-width="2.5"/>'+
+         '<circle cx="'+xa.toFixed(1)+'" cy="'+y+'" r="4.2" fill="#FFFFFF" stroke="#3F3D4C" stroke-width="1.6"/>'+
+         '<circle cx="'+xb.toFixed(1)+'" cy="'+y+'" r="4.6" fill="'+(it.b<=0.05?"#155930":"#FF5515")+'"/>'+
+         '<text x="'+(labW+PW+9)+'" y="'+(y+4)+'" font-size="9.5" fill="#3F3D4C">'+
+         it.a.toFixed(1)+' → <tspan font-weight="700" fill="'+(it.b<=0.05?"#155930":"#111222")+'">'+it.b.toFixed(1)+'</tspan></text>';
+    }
+  });
+  return s+'</svg>';
+}
+
+/* marker plot — baseline, proposed target and threshold on one 0–100% scale */
+function chartMarkers(items,labW){
+  labW=labW||196;
+  const W=700,PITCH=25,H=items.length*PITCH+32,PW=W-labW-58;
+  const x=v=>labW+PW*Math.max(0,Math.min(1,v||0));
+  let s='<svg viewBox="0 0 '+W+' '+H+'" role="img">';
+  for(let g=0;g<=4;g++){
+    const px=labW+PW*g/4;
+    s+='<line x1="'+px+'" y1="18" x2="'+px+'" y2="'+(H-14)+'" stroke="#EDEBE6"/>'+
+       '<text x="'+px+'" y="12" text-anchor="middle" font-size="8.5" fill="#A9A6B0">'+(g*25)+'%</text>';
+  }
+  items.forEach((it,i)=>{
+    const y=26+i*PITCH;
+    s+='<text x="'+(labW-10)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" font-weight="600" fill="#111222">'+esc(it.label)+'</text>';
+    if(it.base==null&&it.target==null){
+      s+='<text x="'+labW+'" y="'+(y+4)+'" font-size="9" fill="#A9A6B0">not measured</text>'; return;
+    }
+    if(it.base!=null&&it.target!=null)
+      s+='<line x1="'+x(it.base).toFixed(1)+'" y1="'+y+'" x2="'+x(it.target).toFixed(1)+'" y2="'+y+'" stroke="#C9C6CE" stroke-width="2.2"/>';
+    if(it.thr!=null)
+      s+='<line x1="'+x(it.thr).toFixed(1)+'" y1="'+(y-8)+'" x2="'+x(it.thr).toFixed(1)+'" y2="'+(y+8)+'" stroke="#3F3D4C" stroke-width="2"/>';
+    if(it.base!=null)
+      s+='<circle cx="'+x(it.base).toFixed(1)+'" cy="'+y+'" r="4" fill="#FFFFFF" stroke="#0C7993" stroke-width="1.8"/>';
+    if(it.target!=null)
+      s+='<circle cx="'+x(it.target).toFixed(1)+'" cy="'+y+'" r="4.4" fill="'+(it.meets?"#155930":"#FF5515")+'"/>';
+    s+='<text x="'+(labW+PW+8)+'" y="'+(y+4)+'" font-size="9" fill="'+(it.meets?"#155930":"#3F3D4C")+'" font-weight="'+(it.meets?700:400)+'">'+
+       (it.meets?"reaches":"short")+'</text>';
+  });
+  return s+'</svg>';
+}
+
 /* ---------- toast ---------- */
 let toastT=null;
 function toast(html){
@@ -366,10 +474,10 @@ const SHEETS=[
   crumb:()=>"Home", rel:[], render:renderHome},
  {id:"00_MASTER",     tab:"00_MASTER",    c:"#0C7993", title:"MASTER SETUP", write:true,
   crumb:()=>"Home ▸ Master setup", rel:["HOME","06_DECISIONS","07_DATAQUALITY"], render:renderMaster},
- {id:"01_NATIONAL",   tab:"01_NATIONAL",  c:"#111222", title:"NATIONAL OVERVIEW",
-  crumb:()=>"Home ▸ National Overview", rel:["02_ZONAL","07_DATAQUALITY"], render:renderNational},
- {id:"02_ZONAL",      tab:"02_ZONAL",     c:"#111222", title:"ZONAL REVIEW",
-  crumb:()=>"Home ▸ National ▸ Zonal Review ▸ <b>"+esc(F.zonal)+"</b>", rel:["01_NATIONAL","03_AP","06_DECISIONS"], render:renderZonal},
+ {id:"01_NATIONAL",   tab:"01_NATIONAL",  c:"#111222", title:"NATIONAL TREND BY AREA PROGRAMME",
+  crumb:()=>"Home ▸ National Trend by AP", rel:["02_ZONAL","03_AP"], render:renderNational},
+ {id:"02_ZONAL",      tab:"02_ZONAL",     c:"#111222", title:"ZONAL INDICATOR COMPARISON",
+  crumb:()=>"Home ▸ National Trend ▸ Zonal Indicator Comparison ▸ <b>"+esc(F.zonal)+"</b>", rel:["01_NATIONAL","03_AP","04_OUTCOME"], render:renderZonal},
  {id:"03_AP",         tab:"03_AP",        c:"#111222", title:"AREA PROGRAMME REVIEW",
   crumb:()=>"Home ▸ Zonal ▸ Area Programme Review ▸ <b>"+esc(CFG.Sel_AP)+"</b>", rel:["02_ZONAL","06_DECISIONS","05_INDICATOR"], render:renderAP},
  {id:"04_OUTCOME",    tab:"04_OUTCOME",   c:"#111222", title:"OUTCOME REVIEW",
@@ -433,10 +541,10 @@ function paintAll(){
   badges();
 }
 function badges(){
-  const crit=countIf(r=>r.Row_Status==="CRITICAL");
+  /* the tab strip carries progress, not error counts: the submission is still moving */
   const setB=(id,v,show)=>{const b=document.querySelector('[data-bdg="'+id+'"]');
     if(!b)return; b.textContent=v; b.hidden=!show;};
-  setB("07_DATAQUALITY",crit,crit>0);
+  setB("07_DATAQUALITY","",false);
   setB("06_DECISIONS",S.dec.length,S.dec.length>0);
 }
 function card(lab,val,sub,cls){
@@ -445,16 +553,17 @@ function card(lab,val,sub,cls){
 }
 
 /* ==================================================================
-   HOME  (§6.1)
+   HOME  —  orientation only.
+   Coverage of the cycle, how far the targets have got, and where to go.
+   Deliberately carries no data-quality figures: the submission is still
+   moving, and this page is read for results, not for corrections.
    ================================================================== */
 function renderHome(){
-  const n=S.master.length, mix=statusMix(S.master), gate=importGate(), pr=progress();
-  const nAP=uniq(S.master.map(r=>r.AP)).length;
-  const p=v=>n?Math.round(v/n*100)+"%":"0%";
+  const pr=progress(), scope=inScope(), appr=countIf(r=>r.Stage===7);
   const nav=[
     ["00_MASTER","00","Master Setup","PEARL · DMEAL",true],
-    ["01_NATIONAL","01","National Overview","National Office SLT"],
-    ["02_ZONAL","02","Zonal Review","Zonal Manager"],
+    ["01_NATIONAL","01","National Trend by AP","National Office SLT"],
+    ["02_ZONAL","02","Zonal Indicator Comparison","Zonal Manager"],
     ["03_AP","03","Area Programme Review","AP Manager · facilitator"],
     ["04_OUTCOME","04","Outcome Review","Sector / technical lead"],
     ["05_INDICATOR","05","Indicator Review","DMEAL · PEARL"],
@@ -462,118 +571,144 @@ function renderHome(){
     ["07_DATAQUALITY","07","Data Quality","DMEAL"],
     ["08_REFERENCE","08","Reference","All users"]
   ];
-  return '<div class="slabel">Workbook status</div>'+
-  '<div class="cards">'+
-    card("Area<br>programmes",nAP,"of "+AP_LIST.length+" on the register","neutral")+
-    card("Indicator<br>rows",n0(n),"one row per AP × indicator","neutral")+
-    card("Ready",mix.READY,p(mix.READY)+" of all rows","ready")+
-    card("Needs<br>review",mix["NEEDS REVIEW"],p(mix["NEEDS REVIEW"])+" of all rows","review")+
-    card("Critical<br>issue",mix.CRITICAL,p(mix.CRITICAL)+" of all rows","critical")+
+  return '<div class="slabel">Coverage of this cycle</div>'+
+  '<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">'+
+    card("Zonal<br>offices",ZONALS.length,ZONALS.map(z=>z.z).join(" · "),"accent")+
+    card("Area<br>programmes",uniq(S.master.map(r=>r.AP)).length,"on the register","teal")+
+    card("Outcomes",OUTCOMES.length,"Goal and OC 1 – OC 4","neutral")+
   '</div>'+
 
-  '<div class="progwrap"><div class="top"><span class="lab">Approval progress — rows at stage 7</span>'+
+  '<div class="progwrap"><div class="top"><span class="lab">Approval progress — targets agreed</span>'+
     '<span class="pct">'+(pr*100).toFixed(0)+'%</span></div>'+
-    '<div class="sub" style="font-size:10px;color:#8A8894;margin:-4px 0 8px">'+
-      countIf(r=>r.Stage===7)+' of '+inScope().length+' rows in scope · '+
-      countIf(r=>r.Row_Status==="REFERENCE")+' rows are out of scope and are not counted</div>'+
+    '<div style="font-size:10px;color:#8A8894;margin:-4px 0 8px">'+
+      n0(appr)+' of '+n0(scope.length)+' indicator targets in scope have been approved</div>'+
     '<div class="track"><i style="width:'+(pr*100).toFixed(1)+'%"></i>'+
       '<span class="tgt" style="left:'+(CFG.ReadinessTarget*100)+'%"></span>'+
       '<span class="tgtlab" style="left:'+(CFG.ReadinessTarget*100)+'%">target '+(CFG.ReadinessTarget*100)+'%</span></div>'+
-    '<div class="gates"><span>Last import: <b>'+esc(CFG.ImportDate)+'</b></span>'+
-      '<span>Import check: <span class="pill '+(gate==="IMPORT OK"?"p-READY":"p-CRITICAL")+'">'+
-        '<span class="ic">'+(gate==="IMPORT OK"?"●":"▲")+'</span>'+gate+'</span></span>'+
-      '<span>Cycle owner: <b>'+esc(CFG.Owner)+'</b></span></div>'+
-    (gate!=="IMPORT OK"?'<p class="tcap" style="color:var(--red);margin-top:14px">The import gate is doing its job: '+
-      'this file is not cleared for distribution until it reads IMPORT OK. '+
-      '<a href="#" data-go="07_DATAQUALITY">Open 07 Data Quality</a> to see which rows are blocking it.</p>':'')+
-    '</div>'+
+    '<div class="gates"><span>Cycle: <b>'+esc(CFG.Cycle)+'</b></span>'+
+      '<span>Stage: <b>'+esc(CFG.Stage)+'</b> · '+
+        (STAGES.find(s=>s.name===CFG.Stage)||STAGES[3]).n+' of 7</span>'+
+      '<span>Owner: <b>'+esc(CFG.Owner)+'</b></span></div></div>'+
 
   '<div class="grid2" style="margin-top:26px">'+
     '<div><div class="slabel" style="margin-top:0">Where do I go?</div><div class="navlist">'+
       nav.map(x=>'<a class="nv" href="#" data-go="'+x[0]+'"><span class="no">'+x[1]+'</span>'+
         '<span class="nm">'+x[2]+(x[4]?'<span class="wr">✎ WRITE</span>':'')+'</span>'+
         '<span class="ro">'+x[3]+'</span></a>').join('')+'</div></div>'+
-    '<div><div class="slabel" style="margin-top:0">How this workbook works</div>'+
+    '<div><div class="slabel" style="margin-top:0">How a target gets agreed</div>'+
       '<div class="legendbox">'+STAGES.map(s=>{
         const here=s.name===CFG.Stage, done=s.n<(STAGES.find(x=>x.name===CFG.Stage)||{n:4}).n;
         return '<div class="stagerow'+(here?' here':done?' done':'')+'"><div class="n">'+s.n+'</div>'+
           '<div><b>'+s.name+'</b> — '+esc(s.desc)+'<br><span class="dim">'+
-          (s.n<=3?'imported from the AP submission':'recorded on sheet 06')+' · owner '+esc(s.owner)+'</span></div></div>';
+          (s.n<=3?'comes in with the AP submission':'recorded on sheet 06')+' · owner '+esc(s.owner)+'</span></div></div>';
       }).join('')+'</div>'+
-      '<p class="tcap">Only sheet 06 accepts typing. Sheets 01–05, 07 and 08 read the same data model, so a decision logged once appears everywhere.</p></div>'+
+      '<p class="tcap">Only sheets 00 and 06 accept typing. Everything else reads the same model, so a decision '+
+      'logged once shows up everywhere.</p></div>'+
   '</div>';
 }
 
 /* ==================================================================
-   01_NATIONAL  (§6.2)
+   01_NATIONAL  —  the trend across Area Programmes, read nationally.
+   One question: from the national picture, which APs are proposing to
+   move, how far, and do their targets land on the threshold?
    ================================================================== */
 function renderNational(){
-  const n=S.master.length,mix=statusMix(S.master),pr=progress();
-  const p=v=>n?Math.round(v/n*100)+"%":"0%";
-  const zrows=ZONALS.map(z=>{
-    const rows=byZ(z.z),m=statusMix(rows),s7=rows.filter(r=>r.Stage===7).length;
-    return {z:z.z,aps:apsOf(z.z).length,n:rows.length,m:m,s7:s7,prog:rows.length?s7/rows.length:0};
-  });
-  const tot={aps:AP_LIST.length,n:n,m:mix,s7:countIf(r=>r.Stage===7),prog:pr};
-  const stat=pr=>pr>=CFG.ReadinessTarget?"READY":pr>0?"NEEDS REVIEW":"CRITICAL";
+  const rows=inScope();
+  const nat=trendOf(rows);
 
-  const noAppr=zrows.filter(r=>r.s7===0).length;
-  const lo=zrows.reduce((a,b)=>b.prog<a.prog?b:a), hi=zrows.reduce((a,b)=>b.prog>a.prog?b:a);
-  const fl=FLAGS.map(f=>({name:f[1],v:flagSum(f[0])})).sort((a,b)=>b.v-a.v)[0];
-  const need=Math.max(0,Math.round(CFG.ReadinessTarget*inScope().length)-tot.s7);
+  const apRows=uniq(rows.map(r=>r.AP)).map(ap=>{
+    const rs=rows.filter(r=>r.AP===ap), t=trendOf(rs);
+    return {ap:ap, z:zoneOfAP(ap), t:t};
+  }).filter(x=>x.t.measured>0)
+    .sort((a,b)=>(a.t.distTarget==null?9e9:a.t.distTarget)-(b.t.distTarget==null?9e9:b.t.distTarget));
 
-  return '<div class="slabel">Target setting readiness</div>'+
+  const zRows=ZONALS.map(z=>({z:z.z, aps:apsOf(z.z).length, t:trendOf(rows.filter(r=>r.Zonal===z.z))}));
+
+  const meets=rows.filter(r=>r.Meets===true).length, measured=rows.filter(r=>r.Dist_Target!=null).length;
+  const best=apRows[0], worst=apRows[apRows.length-1];
+  const climbers=apRows.slice().sort((a,b)=>(b.t.uplift||0)-(a.t.uplift||0));
+  const reaching=apRows.filter(x=>x.t.measured&&x.t.meets/x.t.measured>=0.5).length;
+
+  const pp = v => v==null?"—":v.toFixed(1);
+  const cl = v => v==null?"—":(v*100).toFixed(0)+"%";
+
+  return '<div class="slabel">Where the national submission stands</div>'+
   '<div class="cards">'+
-    card("Total<br>APs",tot.aps,"4 zonal offices","neutral")+
-    card("Indicator<br>rows",n0(n),uniq(S.master.map(r=>r.Code)).length+" indicators","neutral")+
-    card("Ready",mix.READY,p(mix.READY),"ready")+
-    card("Needs<br>review",mix["NEEDS REVIEW"],p(mix["NEEDS REVIEW"]),"review")+
-    card("Monitor",mix.MONITOR,p(mix.MONITOR),"monitor")+
-    card("Critical<br>issue",mix.CRITICAL,p(mix.CRITICAL),"critical")+
-    card("Not<br>applicable",mix.REFERENCE,"outside AP scope","neutral")+
-    card("Approval<br>progress",(pr*100).toFixed(0)+"%","of "+inScope().length+" in scope","accent")+
+    card("Area<br>programmes",apRows.length,"with a measurable target","teal")+
+    card("Indicator<br>targets",n0(measured),"baseline and threshold on record","neutral")+
+    card("Median gap<br>closure",cl(nat.closure),"of the baseline-to-threshold gap","accent")+
+    card("Targets reaching<br>threshold",measured?Math.round(meets/measured*100)+"%":"—",n0(meets)+" of "+n0(measured),"ready")+
+    card("Median distance<br>at baseline",pp(nat.distBase)+"pp","short of threshold","monitor")+
+    card("Median distance<br>at target",pp(nat.distTarget)+"pp","still short of threshold","review")+
   '</div>'+
 
-  '<div class="grid2" style="margin-top:24px">'+
-    '<div><div class="slabel" style="margin-top:0">Readiness by zonal office</div>'+
-      '<div class="chartbox">'+chartStacked(zrows.map(r=>({label:r.z,mix:r.m})),96)+legendStatus()+'</div></div>'+
-    '<div><div class="slabel" style="margin-top:0">Readiness by outcome</div>'+
-      '<div class="chartbox">'+chartStacked(OUTCOMES.map(o=>({label:o,mix:statusMix(S.master.filter(r=>r.Outcome===o))})),74)+legendStatus()+'</div></div>'+
-  '</div>'+
+  '<div class="slabel">Trend by area programme <span class="hint">distance to threshold, in percentage points · '+
+    'hollow dot = baseline, solid dot = proposed target · the line is the movement being proposed</span></div>'+
+  '<div class="chartbox">'+chartDumbbell(apRows.map(x=>({label:x.ap,a:x.t.distBase,b:x.t.distTarget})),148)+
+    '<div class="legend">'+
+      '<div><i style="background:#fff;border-color:#3F3D4C;border-radius:50%"></i>Baseline FY26 — median distance to threshold</div>'+
+      '<div><i style="background:#FF5515;border-color:#FF5515;border-radius:50%"></i>Proposed target FY30 — still short</div>'+
+      '<div><i style="background:#155930;border-color:#155930;border-radius:50%"></i>Proposed target reaches the threshold</div>'+
+    '</div></div>'+
+  '<p class="tcap">Distance is measured in the direction that counts as improvement, so reduction indicators '+
+   '(stunting, violence, child marriage) sit on the same scale as the rest. Medians are used, not means, '+
+   'so one extreme indicator cannot carry an AP.</p>'+
 
-  '<div class="slabel">Stage distribution <span class="hint">where the national submission sits in the process</span></div>'+
-  '<div class="chartbox">'+chartColumn(STAGES.map(s=>({label:s.name,n:s.n,v:countIf(r=>r.Stage===s.n),hl:s.n===7})))+'</div>'+
+  '<div class="slabel">Movement proposed, AP by AP</div>'+
+  '<div class="tscroll"><table class="gt"><thead><tr><th>Zonal</th><th>Area programme</th>'+
+    '<th class="r">Targets</th><th class="r">Distance at<br>baseline (pp)</th>'+
+    '<th class="r">Distance at<br>target (pp)</th><th class="r">Median<br>uplift (pp)</th>'+
+    '<th>Gap closure</th><th class="r">Reaching<br>threshold</th><th class="r">Approved</th></tr></thead><tbody>'+
+    apRows.map(x=>'<tr><td class="dim">'+esc(x.z)+'</td>'+
+      '<td><a href="#" data-openap="'+esc(x.ap)+'"><b>'+esc(x.ap)+'</b></a></td>'+
+      '<td class="r">'+x.t.measured+'</td>'+
+      '<td class="r">'+pp(x.t.distBase)+'</td>'+
+      '<td class="r'+(x.t.distTarget!=null&&x.t.distTarget<=0.05?'" style="color:var(--green);font-weight:700':'')+'">'+pp(x.t.distTarget)+'</td>'+
+      '<td class="r">'+(x.t.uplift==null?"—":(x.t.uplift>0?"+":"")+x.t.uplift.toFixed(1))+'</td>'+
+      '<td>'+barCap(x.t.closure)+'</td>'+
+      '<td class="r">'+x.t.meets+' / '+x.t.measured+'</td>'+
+      '<td class="r">'+x.t.approved+'</td></tr>').join('')+
+    '</tbody></table></div>'+
 
-  '<div class="slabel">Approval progress by zonal <span class="hint">click a zonal name to open sheet 02</span></div>'+
-  '<div class="tscroll"><table class="gt"><thead><tr>'+
-    '<th>Zonal</th><th class="r">APs</th><th class="r">Rows</th><th class="r">Ready</th><th class="r">Review</th>'+
-    '<th class="r">Monitor</th><th class="r">Critical</th><th class="r">Stage 7</th><th>Progress</th><th>Status</th>'+
-  '</tr></thead><tbody>'+
-    zrows.map(r=>'<tr><td><a href="#" data-go="02_ZONAL" data-zonal="'+esc(r.z)+'"><b>'+esc(r.z)+'</b></a></td>'+
-      '<td class="r">'+r.aps+'</td><td class="r">'+r.n+'</td>'+
-      '<td class="r'+(r.m.READY===0?" zero":"")+'">'+r.m.READY+'</td>'+
-      '<td class="r">'+r.m["NEEDS REVIEW"]+'</td><td class="r">'+r.m.MONITOR+'</td>'+
-      '<td class="r'+(r.m.CRITICAL>0?" crit":"")+'">'+r.m.CRITICAL+'</td>'+
-      '<td class="r">'+r.s7+'</td><td>'+bar(r.prog)+'</td><td>'+pill(stat(r.prog))+'</td></tr>').join('')+
-  '</tbody><tfoot><tr><td>NATIONAL</td><td class="r">'+tot.aps+'</td><td class="r">'+tot.n+'</td>'+
-    '<td class="r">'+mix.READY+'</td><td class="r">'+mix["NEEDS REVIEW"]+'</td><td class="r">'+mix.MONITOR+'</td>'+
-    '<td class="r" style="color:var(--red)">'+mix.CRITICAL+'</td><td class="r">'+tot.s7+'</td>'+
-    '<td>'+bar(tot.prog)+'</td><td>'+pill(stat(tot.prog))+'</td></tr></tfoot></table></div>'+
+  '<div class="slabel">Rolled up by zonal office</div>'+
+  '<div class="tscroll"><table class="gt"><thead><tr><th>Zonal</th><th class="r">APs</th>'+
+    '<th class="r">Targets</th><th class="r">Distance at baseline (pp)</th><th class="r">Distance at target (pp)</th>'+
+    '<th class="r">Median uplift (pp)</th><th>Gap closure</th><th class="r">Reaching threshold</th></tr></thead><tbody>'+
+    zRows.map(z=>'<tr><td><a href="#" data-go="02_ZONAL" data-zonal="'+esc(z.z)+'"><b>'+esc(z.z)+'</b></a></td>'+
+      '<td class="r">'+z.aps+'</td><td class="r">'+z.t.measured+'</td>'+
+      '<td class="r">'+pp(z.t.distBase)+'</td><td class="r">'+pp(z.t.distTarget)+'</td>'+
+      '<td class="r">'+(z.t.uplift==null?"—":(z.t.uplift>0?"+":"")+z.t.uplift.toFixed(1))+'</td>'+
+      '<td>'+barCap(z.t.closure)+'</td>'+
+      '<td class="r">'+z.t.meets+' / '+z.t.measured+'</td></tr>').join('')+
+    '</tbody><tfoot><tr><td>NATIONAL</td><td class="r">'+AP_LIST.length+'</td><td class="r">'+nat.measured+'</td>'+
+      '<td class="r">'+pp(nat.distBase)+'</td><td class="r">'+pp(nat.distTarget)+'</td>'+
+      '<td class="r">'+(nat.uplift==null?"—":(nat.uplift>0?"+":"")+nat.uplift.toFixed(1))+'</td>'+
+      '<td>'+barCap(nat.closure)+'</td>'+
+      '<td class="r">'+meets+' / '+measured+'</td></tr></tfoot></table></div>'+
 
-  '<div class="slabel">National insights <span class="hint">formula-driven — never stale</span></div>'+
+  '<div class="slabel">What the national trend says</div>'+
   '<div class="insights">'+
-    '<p><span class="mk">▸</span><span><b>'+noAppr+' of 4</b> zonal offices have no rows at Approval stage.</span></p>'+
-    '<p><span class="mk">▸</span><span><b>'+esc(lo.z)+'</b> has the lowest readiness at <span class="bad">'+(lo.prog*100).toFixed(0)+
-      '%</span>. <b>'+esc(hi.z)+'</b> has the highest at <b>'+(hi.prog*100).toFixed(0)+'%</b>.</span></p>'+
-    '<p><span class="mk">▸</span><span>Largest single blocker: <b>'+esc(fl.name.toLowerCase())+'</b> ('+n0(fl.v)+' rows).</span></p>'+
-    '<p><span class="mk">▸</span><span>'+(CFG.ReadinessTarget*100)+'% readiness target requires <b>'+n0(need)+
-      '</b> further rows to reach Approval.</span></p>'+
+    (best?'<p><span class="mk">▸</span><span><b>'+esc(best.ap)+'</b> proposes targets closest to the threshold — '+
+      'a median of <b>'+pp(best.t.distTarget)+'pp</b> short. <b>'+esc(worst.ap)+'</b> is furthest, at <b>'+
+      pp(worst.t.distTarget)+'pp</b>.</span></p>':'')+
+    (climbers.length?'<p><span class="mk">▸</span><span>The largest proposed movement is in <b>'+esc(climbers[0].ap)+
+      '</b>, a median uplift of <b>'+(climbers[0].t.uplift==null?"—":climbers[0].t.uplift.toFixed(1)+'pp')+
+      '</b>. The smallest is <b>'+esc(climbers[climbers.length-1].ap)+'</b> at <b>'+
+      (climbers[climbers.length-1].t.uplift==null?"—":climbers[climbers.length-1].t.uplift.toFixed(1)+'pp')+'</b>.</span></p>':'')+
+    '<p><span class="mk">▸</span><span><b>'+reaching+' of '+apRows.length+'</b> APs propose targets that reach '+
+      'the threshold on at least half of their indicators.</span></p>'+
+    '<p><span class="mk">▸</span><span>Nationally the submission proposes to close <b>'+cl(nat.closure)+
+      '</b> of the distance between baseline and threshold. Closing it fully would mean a median gap closure of 100%.</span></p>'+
   '</div>'+
-  '<p class="tcap">No slicers on this sheet by design (§Appendix B): the national view is deliberately unfilterable, so a screenshot of it is always the whole country.</p>';
+  '<p class="tcap">Gap closure is the share of the baseline-to-threshold distance a proposed target covers: '+
+   '100% lands exactly on the threshold, above 100% goes past it, below 100% falls short. '+
+   'It is comparable across indicators of different scales and directions, which a simple average of percentages is not.</p>';
 }
 
 /* ==================================================================
-   02_ZONAL  (§6.3)
+   02_ZONAL  —  comparison between indicators inside one zonal office.
+   One question: within this zone, which indicators are proposing to
+   land on their threshold, and which are being left far short?
    ================================================================== */
 function slicer(name,field,items,sel,multi){
   return '<div class="slicer" data-slicer="'+field+'"><div class="sh"><span>'+name+'</span>'+
@@ -584,91 +719,122 @@ function slicer(name,field,items,sel,multi){
         ' class="'+(on?"sel":"")+(it.n===0?" nodata":"")+'">'+esc(it.v)+(it.n!==undefined?' <span class="dim">'+it.n+'</span>':'')+'</button>';
     }).join('')+'</div></div>';
 }
+function addDays(iso,n){const d=new Date(iso);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+
 function zonalRows(){
-  let rows=byZ(F.zonal);
+  let rows=inScope().filter(r=>r.Zonal===F.zonal);
   if(F.outcome!=="(All)") rows=rows.filter(r=>r.Outcome===F.outcome);
-  if(F.status.length) rows=rows.filter(r=>F.status.indexOf(r.Row_Status)>=0);
   return rows;
 }
 function renderZonal(){
-  const all=byZ(F.zonal), rows=zonalRows(), mix=statusMix(rows);
-  const aps=apsOf(F.zonal);
-  const s7=rows.filter(r=>r.Stage===7).length;
-  const apRows=aps.map(ap=>{
-    let rs=rows.filter(r=>r.AP===ap); const m=statusMix(rs);
-    const a7=rs.filter(r=>r.Stage===7).length;
-    return {ap:ap,n:rs.length,m:m,s7:a7,prog:rs.length?a7/rs.length:0};
-  });
-  /* indicators needing support — top 10 critical, descending */
-  const crit={};
-  rows.filter(r=>r.Row_Status==="CRITICAL").forEach(r=>{crit[r.Code]=(crit[r.Code]||0)+1;});
-  const support=Object.keys(crit).map(c=>({c:c,v:crit[c]})).sort((a,b)=>b.v-a.v).slice(0,10);
-  /* discussion & approval status */
-  const dstat=STATUS_LIST;
-  /* action list from tblDecision */
-  const act=S.dec.filter(d=>d.Zonal===F.zonal&&d.Status!=="Approved")
-    .sort((a,b)=>String(a.Due_Date).localeCompare(String(b.Due_Date))).slice(0,14);
+  const rows=zonalRows(), aps=apsOf(F.zonal);
+  const zt=trendOf(rows);
+  const codes=uniq(rows.map(r=>r.Code)).sort();
+
+  const ind=codes.map(c=>{
+    const rs=rows.filter(r=>r.Code===c), meta=IND[c]||{}, t=trendOf(rs);
+    const tgts=rs.map(r=>r.Pct_LOP).filter(v=>!isBlank(v)).map(Number);
+    return {c:c, short:meta.short||c, oc:meta.oc||"", dir:meta.dir||1,
+      aps:uniq(rs.map(r=>r.AP)).length,
+      base:med(rs.map(r=>r.Pct_Base).filter(v=>!isBlank(v)).map(Number)),
+      thr:med(rs.map(r=>r.Threshold).filter(v=>!isBlank(v)).map(Number)),
+      tgt:med(tgts),
+      lo:tgts.length?Math.min.apply(null,tgts):null,
+      hi:tgts.length?Math.max.apply(null,tgts):null,
+      t:t, rs:rs};
+  }).sort((a,b)=>(a.t.closure==null?9e9:a.t.closure)-(b.t.closure==null?9e9:b.t.closure));
+
+  const measured=rows.filter(r=>r.Dist_Target!=null).length;
+  const meets=rows.filter(r=>r.Meets===true).length;
+  const weakest=ind.filter(i=>i.t.closure!=null)[0];
+  const strongest=ind.filter(i=>i.t.closure!=null).slice(-1)[0];
+  const behind=ind.filter(i=>i.t.closure!=null&&i.t.closure<0.5).length;
+  const cl=v=>v==null?"—":(v*100).toFixed(0)+"%";
 
   return '<div class="fband"><div class="frow">'+
-      '<div class="fcell"><label>Report filter · Zonal</label><select data-rf="zonal">'+
+      '<div class="fcell"><label>Zonal office</label><select data-rf="zonal">'+
         ZONALS.map(z=>'<option'+(z.z===F.zonal?" selected":"")+'>'+z.z+'</option>').join('')+'</select></div>'+
-      '<div class="fcell"><label>Report filter · Outcome</label><select data-rf="outcome">'+
-        ["(All)"].concat(OUTCOMES).map(o=>'<option'+(o===F.outcome?" selected":"")+'>'+o+'</option>').join('')+'</select></div>'+
-      slicer("Slicer · Zonal","zonal",ZONALS.map(z=>({v:z.z,n:byZ(z.z).length})),F.zonal,false)+
-      slicer("Slicer · Row status","status",STATUS.map(s=>({v:s.s,n:all.filter(r=>r.Row_Status===s.s).length})),F.status,true)+
-    '</div><div class="fnote">The report-filter cells and the slicers drive the same pivot fields, so they always agree — and the breadcrumb reads the filter cell (§3.3).</div></div>'+
+      '<div class="fcell"><label>Outcome</label><select data-rf="outcome">'+
+        ["(All)"].concat(OUTCOMES).map(o=>'<option'+(o===F.outcome?" selected":"")+'>'+
+          (o==="(All)"?"(All outcomes)":esc(OUTCOME_LABEL[o]))+'</option>').join('')+'</select></div>'+
+      slicer("Zonal","zonal",ZONALS.map(z=>({v:z.z,n:inScope().filter(r=>r.Zonal===z.z).length})),F.zonal,false)+
+      slicer("Outcome","outcome",["(All)"].concat(OUTCOMES).map(o=>({v:o,
+        n:o==="(All)"?inScope().filter(r=>r.Zonal===F.zonal).length
+                     :inScope().filter(r=>r.Zonal===F.zonal&&r.Outcome===o).length})),F.outcome,false)+
+    '</div></div>'+
 
-  '<div class="slabel">Zonal summary — '+esc(F.zonal)+(F.outcome!=="(All)"?' · '+esc(F.outcome):'')+
-    (F.status.length?' <span class="hint">status filter active: '+esc(F.status.join(", "))+'</span>':'')+'</div>'+
-  '<div class="cards">'+
-    card("Area<br>programmes",aps.length,"in this zonal","neutral")+
-    card("Rows",rows.length,(rows.length!==all.length?"of "+all.length+" unfiltered":"all rows"),"neutral")+
-    card("Ready",mix.READY,"","ready")+
-    card("Needs<br>review",mix["NEEDS REVIEW"],"","review")+
-    card("Critical",mix.CRITICAL,"","critical")+
-    card("At<br>approval",(rows.length?Math.round(s7/rows.length*100):0)+"%",s7+" rows at stage 7","accent")+
+  '<div class="cards" style="margin-top:16px">'+
+    card("Area<br>programmes",aps.length,"in "+esc(F.zonal),"teal")+
+    card("Indicators<br>compared",codes.length,"of "+INDICATORS.length+" in the catalogue","neutral")+
+    card("Median gap<br>closure",cl(zt.closure),"across this zone","accent")+
+    card("Reaching<br>threshold",measured?Math.round(meets/measured*100)+"%":"—",meets+" of "+measured+" targets","ready")+
+    card("Indicators left<br>far short",behind,"gap closure under 50%","review")+
+    card("Median distance<br>at target",zt.distTarget==null?"—":zt.distTarget.toFixed(1)+"pp","short of threshold","monitor")+
   '</div>'+
 
-  '<div class="grid2u" style="margin-top:24px">'+
-   '<div><div class="slabel" style="margin-top:0">AP readiness <span class="hint">pvtZonAP</span></div>'+
-    '<div class="tscroll"><table class="gt"><thead><tr><th>Area programme</th><th class="r">Rows</th>'+
-      '<th class="r">Ready</th><th class="r">Rev</th><th class="r">Mon</th><th class="r">Crit</th>'+
-      '<th>Progress</th><th></th></tr></thead><tbody>'+
-      apRows.map(r=>'<tr'+(r.ap===CFG.Sel_AP?' class="hl"':'')+'><td><b>'+esc(r.ap)+'</b></td><td class="r">'+r.n+'</td>'+
-        '<td class="r'+(r.m.READY===0?" zero":"")+'">'+r.m.READY+'</td><td class="r">'+r.m["NEEDS REVIEW"]+'</td>'+
-        '<td class="r">'+r.m.MONITOR+'</td><td class="r'+(r.m.CRITICAL>0?" crit":"")+'">'+r.m.CRITICAL+'</td>'+
-        '<td>'+bar(r.prog)+'</td><td><a href="#" data-openap="'+esc(r.ap)+'">open →</a></td></tr>').join('')+
-      '</tbody></table></div>'+
-    '<div class="slabel">Discussion &amp; approval status <span class="hint">pvtZonStage · count of rows by latest decision status</span></div>'+
-    '<div class="tscroll"><table class="gt"><thead><tr><th>Area programme</th>'+
-      dstat.map(s=>'<th class="r">'+s.replace(" Requested","<br>Req.")+'</th>').join('')+'</tr></thead><tbody>'+
-      aps.map(ap=>{
-        const rs=rows.filter(r=>r.AP===ap);
-        return '<tr><td><b>'+esc(ap)+'</b></td>'+dstat.map(s=>{
-          const v=rs.filter(r=>(r.Dec_Status||"Not started")===s).length;
-          return '<td class="r'+(v===0?' dim':'')+'">'+v+'</td>';}).join('')+'</tr>';
-      }).join('')+'</tbody></table></div></div>'+
+  '<div class="slabel">Indicator comparison — '+esc(F.zonal)+
+    (F.outcome!=="(All)"?' · '+esc(F.outcome):'')+
+    ' <span class="hint">weakest gap closure first · hollow dot = baseline, solid dot = proposed target, '+
+    'vertical bar = threshold</span></div>'+
+  '<div class="chartbox">'+chartMarkers(ind.map(i=>({
+      label:i.short+(i.dir===-1?" ↓":""), base:i.base, target:i.tgt, thr:i.thr,
+      meets:i.thr!=null&&i.tgt!=null&&(i.dir===1?i.tgt>=i.thr:i.tgt<=i.thr)})),206)+
+    '<div class="legend">'+
+      '<div><i style="background:#fff;border-color:#0C7993;border-radius:50%"></i>Baseline FY26 (median)</div>'+
+      '<div><i style="background:#FF5515;border-color:#FF5515;border-radius:50%"></i>Proposed target FY30 — short</div>'+
+      '<div><i style="background:#155930;border-color:#155930;border-radius:50%"></i>Proposed target reaches threshold</div>'+
+      '<div><i style="background:#3F3D4C;border-color:#3F3D4C;width:3px"></i>Threshold</div>'+
+      '<div>↓ reduction indicator — lower is better</div>'+
+    '</div></div>'+
 
-   '<div><div class="slabel" style="margin-top:0">Indicators needing support <span class="hint">top 10 critical</span></div>'+
-    '<div class="tscroll"><table class="gt"><thead><tr><th>Code</th><th>Indicator</th><th class="r">Crit</th></tr></thead><tbody>'+
-      (support.length?support.map(s=>'<tr><td class="code">'+esc(s.c)+'</td><td>'+esc(IND[s.c]?IND[s.c].short:"")+
-        '</td><td class="r crit">'+s.v+'</td></tr>').join('')
-        :'<tr><td colspan="3" class="dim">No critical rows under the current filter. Nothing to escalate.</td></tr>')+
-      '</tbody></table></div>'+
-    '<div class="slabel">Action list <span class="hint">open items, earliest due first</span></div>'+
-    '<div class="tscroll"><table class="gt"><thead><tr><th>AP</th><th>Code</th><th>Decision</th><th>Owner</th><th>Due</th><th>Status</th></tr></thead><tbody>'+
-      (act.length?act.map(d=>{
-        const late=d.Due_Date<TODAY, soon=!late&&d.Due_Date<=addDays(TODAY,7);
-        return '<tr><td>'+esc(d.AP)+'</td><td class="code">'+esc(d.Code)+'</td><td>'+esc(d.Decision)+'</td>'+
-        '<td>'+esc(d.Owner)+'</td><td class="nowrap'+(late?' miss':'')+'" style="text-align:left'+(soon?';background:var(--f-review)':'')+'">'+
-        dmy(d.Due_Date)+(late?' <b>overdue</b>':'')+'</td><td>'+esc(d.Status)+'</td></tr>';}).join('')
-        :'<tr><td colspan="6" class="dim">No open items logged for this zonal yet. Log the first one on sheet 06.</td></tr>')+
-      '</tbody></table></div>'+
-    '<p class="tcap">Overdue is shaded '+'<span style="background:var(--f-critical);color:var(--red);padding:1px 4px">red</span>'+
-      ', due within 7 days <span style="background:var(--f-review);color:var(--amber);padding:1px 4px">amber</span> (§6.3 ·10).</p></div>'+
+  '<div class="slabel">Indicator by indicator</div>'+
+  '<div class="tscroll"><table class="gt"><thead><tr><th>Code</th><th>Indicator</th><th class="c">OC</th>'+
+    '<th class="r">APs</th><th class="r">Baseline</th><th class="r">Threshold</th><th class="r">Target</th>'+
+    '<th class="r">Uplift (pp)</th><th>Gap closure</th><th class="r">Reaching</th>'+
+    '<th class="r">Spread of targets<br>across APs</th></tr></thead><tbody>'+
+    (ind.length?ind.map(i=>'<tr><td class="code">'+esc(i.c)+'</td>'+
+      '<td>'+esc(i.short)+(i.dir===-1?' <span class="dim">↓</span>':'')+'</td>'+
+      '<td class="c dim">'+esc(i.oc)+'</td><td class="r">'+i.aps+'</td>'+
+      '<td class="'+(i.base==null?"miss":"r")+'">'+pct(i.base)+'</td>'+
+      '<td class="'+(i.thr==null?"miss":"r")+'">'+(i.thr==null?"TBC":pct(i.thr))+'</td>'+
+      '<td class="r">'+pct(i.tgt)+'</td>'+
+      '<td class="r">'+(i.t.uplift==null?"—":(i.t.uplift>0?"+":"")+i.t.uplift.toFixed(1))+'</td>'+
+      '<td>'+barCap(i.t.closure)+'</td>'+
+      '<td class="r">'+i.t.meets+' / '+i.t.measured+'</td>'+
+      '<td class="r dim">'+(i.lo==null?"—":pct(i.lo,0)+" – "+pct(i.hi,0))+'</td></tr>').join('')
+      :'<tr><td colspan="11" class="dim">No indicators under this filter. Choose another outcome.</td></tr>')+
+    '</tbody></table></div>'+
+
+  '<div class="slabel">Proposed target by AP <span class="hint">the same indicators, side by side across '+
+    esc(F.zonal)+'\u2019s area programmes</span></div>'+
+  '<div class="tscroll"><table class="gt"><thead><tr><th>Indicator</th><th class="r">Threshold</th>'+
+    aps.map(a=>'<th class="r">'+esc(a)+'</th>').join('')+'</tr></thead><tbody>'+
+    ind.map(i=>'<tr><td>'+esc(i.short)+(i.dir===-1?' <span class="dim">↓</span>':'')+'</td>'+
+      '<td class="'+(i.thr==null?"miss":"r")+'">'+(i.thr==null?"TBC":pct(i.thr,0))+'</td>'+
+      aps.map(a=>{
+        const r=i.rs.find(x=>x.AP===a);
+        if(!r) return '<td class="r dim">·</td>';
+        if(isBlank(r.Pct_LOP)) return '<td class="r dim">—</td>';
+        const ok=r.Meets===true;
+        return '<td class="r"'+(ok?' style="color:var(--green);font-weight:700"':'')+'>'+pct(r.Pct_LOP,0)+'</td>';
+      }).join('')+'</tr>').join('')+
+    '</tbody></table></div>'+
+  '<p class="tcap">A dot means the AP does not measure that indicator; a dash means it measures it but has not '+
+   'proposed a target yet. Figures in green reach the threshold. Click an AP name on sheet 01, or open '+
+   '<a href="#" data-go="03_AP">03 Area Programme Review</a>, to work through one AP\u2019s indicators in the workshop.</p>'+
+
+  '<div class="slabel">What this zone\u2019s comparison says</div>'+
+  '<div class="insights">'+
+    (weakest?'<p><span class="mk">▸</span><span>Weakest ambition: <b>'+esc(weakest.short)+'</b>, closing only <b>'+
+      cl(weakest.t.closure)+'</b> of the gap to its threshold across '+weakest.aps+' AP'+(weakest.aps===1?'':'s')+'.</span></p>':'')+
+    (strongest?'<p><span class="mk">▸</span><span>Strongest: <b>'+esc(strongest.short)+'</b> at <b>'+
+      cl(strongest.t.closure)+'</b>.</span></p>':'')+
+    '<p><span class="mk">▸</span><span><b>'+behind+' of '+ind.length+'</b> indicators propose to close less than '+
+      'half the distance to their threshold — these are the ones worth the discussion time.</span></p>'+
+    '<p><span class="mk">▸</span><span>Across '+esc(F.zonal)+', <b>'+meets+' of '+measured+'</b> proposed targets '+
+      'land on or beyond the threshold.</span></p>'+
   '</div>';
 }
-function addDays(iso,n){const d=new Date(iso);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
 
 /* ==================================================================
    03_AP  (§6.4) — the workshop handout. Fixed 30-row dossier.
@@ -1869,6 +2035,82 @@ function fileDecisions(){
     p.rows.map(r=>"  ["+r.map(jv).join(",")+"]").join(",\n")+"\n  ]\n};\n";
 }
 
+
+/* ==================================================================
+   ACCESS CODE
+   A courtesy lock, not security. It keeps the page from being read by
+   whoever stumbles on the link; it cannot protect the data, because a
+   static site ships its own source. Treat the contents accordingly.
+   ================================================================== */
+const GATE_CODE = "wvipearl";
+const GATE_KEY  = "wvi_aimplus_gate";
+
+function gatePassed(){ try{ return sessionStorage.getItem(GATE_KEY)==="1"; }catch(e){ return false; } }
+function gateRemember(){ try{ sessionStorage.setItem(GATE_KEY,"1"); }catch(e){} }
+
+function gateStyles(){
+  if(document.getElementById("gateCSS")) return;
+  const s=document.createElement("style"); s.id="gateCSS";
+  s.textContent=
+  "#gate{position:fixed;inset:0;z-index:200;background:#111222;display:flex;align-items:center;"+
+  "justify-content:center;padding:24px;font-family:'Inter','Inter var',-apple-system,'Segoe UI',Roboto,Calibri,sans-serif}"+
+  "#gate .box{width:100%;max-width:430px}"+
+  "#gate .eyebrow{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#FF8B5C}"+
+  "#gate h1{margin:10px 0 0;font-size:23px;line-height:1.18;font-weight:700;color:#fff;letter-spacing:-.015em}"+
+  "#gate .cyc{margin-top:7px;font-size:12px;color:#9C99A6}"+
+  "#gate .rule{height:2px;width:54px;background:#FF5515;margin:20px 0 22px}"+
+  "#gate label{display:block;font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9C99A6;margin-bottom:7px}"+
+  "#gate .row{display:flex;gap:9px}"+
+  "#gate input{flex:1;background:#1B1C2E;border:1px solid #3A3947;color:#fff;padding:11px 13px;"+
+  "font-size:14px;border-radius:2px;letter-spacing:.14em}"+
+  "#gate input:focus{outline:none;border-color:#FF5515;background:#202135}"+
+  "#gate input::placeholder{color:#5A5867;letter-spacing:.06em}"+
+  "#gate button{background:#FF5515;border:1px solid #FF5515;color:#fff;font-weight:700;font-size:13px;"+
+  "padding:11px 20px;border-radius:2px;cursor:pointer;white-space:nowrap}"+
+  "#gate button:hover{background:#E64A0F}"+
+  "#gate .err{min-height:18px;margin-top:11px;font-size:11.5px;font-weight:600;color:#FF8B7A}"+
+  "#gate .note{margin-top:26px;padding-top:16px;border-top:1px solid #2A2937;font-size:10.5px;line-height:1.65;color:#6F6D7A}"+
+  "#gate .note b{color:#9C99A6;font-weight:600}";
+  document.head.appendChild(s);
+}
+
+function showGate(next){
+  gateStyles();
+  const g=document.createElement("div");
+  g.id="gate";
+  g.innerHTML =
+    '<div class="box">'+
+      '<div class="eyebrow">PEARL · Wahana Visi Indonesia</div>'+
+      '<h1>AIM+ Area Programme<br>Target Setting</h1>'+
+      '<div class="cyc">Decision Workbook · '+esc(CFG.Cycle)+' · '+esc(CFG.Version)+'</div>'+
+      '<div class="rule"></div>'+
+      '<label for="gateInput">Access code</label>'+
+      '<div class="row">'+
+        '<input id="gateInput" type="password" placeholder="••••••••" autocomplete="off" '+
+          'spellcheck="false" autocapitalize="off">'+
+        '<button id="gateGo">Open workbook</button>'+
+      '</div>'+
+      '<div class="err" id="gateErr"></div>'+
+      '<div class="note">Internal working file. Baselines and targets are <b>still moving</b> — '+
+        'nothing here is final, and it is not for circulation outside WVI.</div>'+
+    '</div>';
+  document.body.appendChild(g);
+
+  const inp=g.querySelector("#gateInput"), err=g.querySelector("#gateErr");
+  let tries=0;
+  const submit=()=>{
+    if(String(inp.value||"").trim().toLowerCase()===GATE_CODE){
+      gateRemember(); g.remove(); next(); return;
+    }
+    tries++;
+    err.textContent = tries>=3 ? "Still not right. The code comes from PEARL." : "That code does not open this workbook.";
+    inp.value=""; inp.focus();
+  };
+  g.querySelector("#gateGo").onclick=submit;
+  inp.onkeydown=ev=>{ if(ev.key==="Enter") submit(); };
+  setTimeout(()=>inp.focus(),40);
+}
+
 /* ==================================================================
    BOOT
    ================================================================== */
@@ -1915,6 +2157,10 @@ function boot(){
   if(apsOf(F.zonal).indexOf(CFG.Sel_AP)<0) CFG.Sel_AP=apsOf(F.zonal)[0];
   F.ind=(S.master.find(r=>r.AP===CFG.Sel_AP)||{}).Code||INDICATORS[0].code;
 
+  if(gatePassed()) openWorkbook(); else showGate(openWorkbook);
+}
+
+function openWorkbook(){
   buildFrames(); chip();
 
   document.getElementById("tabbar").onclick=ev=>{
