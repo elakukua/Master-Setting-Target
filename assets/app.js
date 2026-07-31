@@ -20,11 +20,13 @@ const N = v => { const f=parseFloat(v); return isFinite(f)?f:0; };
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 
 /* ---------- kosakata status (§3) ---------- */
+/* Kosakata mengikuti pilihan yang dipakai PEARL di file Excel.
+   Logikanya tidak berubah — hanya labelnya. */
 const ST_IND=[
- {v:"Baik",            ic:"●", cls:"s-baik",    desc:"Endline mencapai threshold DAN delta mencapai target"},
- {v:"Perlu ditinjau",  ic:"◆", cls:"s-tinjau",  desc:"Salah satu tercapai, satunya belum"},
- {v:"Perlu perhatian", ic:"▲", cls:"s-hati",    desc:"Keduanya belum tercapai"},
- {v:"Belum ada data",  ic:"◧", cls:"s-belum",   desc:"Baseline atau endline masih 0"}
+ {v:"Sesuai Target/Threshold", ic:"●", cls:"s-baik",   desc:"Endline mencapai threshold DAN delta mencapai target"},
+ {v:"Ditinjau",                ic:"◆", cls:"s-tinjau", desc:"Salah satu tercapai, satunya belum"},
+ {v:"Perhatian",               ic:"▲", cls:"s-hati",   desc:"Keduanya belum tercapai"},
+ {v:"Belum ada data",          ic:"◧", cls:"s-belum",  desc:"Baseline atau endline masih 0"}
 ];
 const ST_THR=[
  {v:"Tercapai",       ic:"●", cls:"s-baik"},
@@ -104,9 +106,9 @@ function recompute(){
       : (arah==="Turun" ? (r._delta<=tgt+EPS?"Capai target":"Meleset dari target")
                         : (r._delta>=tgt-EPS?"Capai target":"Meleset dari target"));
     r._status = (r._thr_status==="Belum ada data"||r._tgt_status==="Belum ada data") ? "Belum ada data"
-      : (r._thr_status==="Tercapai"&&r._tgt_status==="Capai target") ? "Baik"
-      : (r._thr_status==="Tercapai"||r._tgt_status==="Capai target") ? "Perlu ditinjau"
-      : "Perlu perhatian";
+      : (r._thr_status==="Tercapai"&&r._tgt_status==="Capai target") ? "Sesuai Target/Threshold"
+      : (r._thr_status==="Tercapai"||r._tgt_status==="Capai target") ? "Ditinjau"
+      : "Perhatian";
     r._berlaku = berlakuOf(ind,ap);
     r._short = shortOf(ind);
     r._dupe = dupKey[ap+"|"+ind]>1;
@@ -173,8 +175,8 @@ const CLR={
   baseline:"#0C7993", threshold:"#D8D6D1", endline:"#FF5515",
   zonal:["#0C7993","#155930","#FF5515","#3F3D4C"], ref:"#3F3D4C"
 };
-const SER_IND=[["Baik",CLR.baik],["Perlu ditinjau",CLR.tinjau],
-               ["Perlu perhatian",CLR.hati],["Belum ada data",CLR.belum]];
+const SER_IND=[["Sesuai Target/Threshold",CLR.baik],["Ditinjau",CLR.tinjau],
+               ["Perhatian",CLR.hati],["Belum ada data",CLR.belum]];
 const SER_THR=[["Tercapai",CLR.baik],["Tidak tercapai",CLR.hati],["Belum ada data",CLR.belum]];
 const SER_TGT=[["Capai target",CLR.baik],["Meleset dari target",CLR.hati],["Belum ada data",CLR.belum]];
 
@@ -209,9 +211,9 @@ function chartStack(items,series,opt){
       const col=series[k][1];
       s+='<rect x="'+x.toFixed(1)+'" y="'+y+'" width="'+w.toFixed(1)+'" height="'+BH+'" fill="'+col+'"'+
          (col===CLR.belum?' stroke="#C9C6CE" stroke-width=".6"':'')+'/>';
-      if(w>22) s+='<text x="'+(x+w/2).toFixed(1)+'" y="'+(y+BH/2+3.5)+'" text-anchor="middle" font-size="9" font-weight="700" fill="'+
-        (col===CLR.belum||col===CLR.tinjau?"#3F3D4C":"#FFFFFF")+'">'+
-        (opt.pct100?Math.round(v/tot*100)+"%":v)+'</text>';
+      const lbl = opt.labelCount ? v : (opt.pct100?Math.round(v/tot*100)+"%":v);
+      if(w>18) s+='<text x="'+(x+w/2).toFixed(1)+'" y="'+(y+BH/2+3.5)+'" text-anchor="middle" font-size="9" font-weight="700" fill="'+
+        (col===CLR.belum||col===CLR.tinjau?"#3F3D4C":"#FFFFFF")+'">'+lbl+'</text>';
       x+=w;
     });
     s+='<text x="'+(labW+PW+8)+'" y="'+(y+BH/2+4)+'" font-size="9.5" fill="#8A8894">'+tot+'</text>';
@@ -515,7 +517,7 @@ function renderAnalisis(){
   const g5=aps.map(ap=>{
     const rs=rows.filter(r=>r["Area Program"]===ap);
     return {label:ap, vals:ST_IND.map(s=>rs.filter(r=>r._status===s.v).length),
-      score:rs.filter(r=>r._status==="Baik"||r._status==="Perlu ditinjau").length/(rs.length||1)};
+      score:rs.filter(r=>r._status==="Sesuai Target/Threshold"||r._status==="Ditinjau").length/(rs.length||1)};
   }).sort((a,b)=>b.score-a.score);
 
   /* G6 · endline vs threshold per AP — urutan sama dengan G5 supaya bisa dibaca berpasangan */
@@ -545,17 +547,22 @@ function renderAnalisis(){
   const view=sortRows(rows);
   const cap=F.showAll?view.length:Math.min(view.length,150);
   const c=checks();
+  const nInd=uniq(rows.map(r=>r.Indicator)).length;
+  const indTercapai=uniq(rows.filter(r=>r._thr_status==="Tercapai").map(r=>r.Indicator)).length;
+  const indTarget=uniq(rows.filter(r=>r._tgt_status==="Capai target").map(r=>r.Indicator)).length;
+  const indSesuai=uniq(rows.filter(r=>r._status==="Sesuai Target/Threshold").map(r=>r.Indicator)).length;
 
   return filterBand(true)+
 
-  '<div class="slabel">Ringkasan status'+activeLine()+'</div>'+
+  '<div class="slabel">Ringkasan'+activeLine()+'</div>'+
   '<div class="cards">'+
-    card("Baik",cnt("_status","Baik"),"","ready")+
-    card("Perlu<br>ditinjau",cnt("_status","Perlu ditinjau"),"","review")+
-    card("Perlu<br>perhatian",cnt("_status","Perlu perhatian"),"","critical")+
-    card("Belum<br>ada data",cnt("_status","Belum ada data"),(n?(cnt("_status","Belum ada data")/n*100).toFixed(0)+"% dari "+n0(n)+" baris":""),"belum")+
-    card("Tercapai<br>threshold",cnt("_thr_status","Tercapai"),cnt("_thr_status","Tidak tercapai")+" tidak tercapai","teal")+
-    card("Capai<br>target",cnt("_tgt_status","Capai target"),cnt("_tgt_status","Meleset dari target")+" meleset","accent")+
+    card("Area<br>Program",aps.length,"dari "+AP_LIST.length+" terdaftar","teal")+
+    card("Zonal",uniq(rows.map(r=>r.Zonal)).length,"","neutral")+
+    card("Tercapai<br>threshold",indTercapai,"indikator, dari "+nInd,"teal")+
+    card("Sesuai Target<br>/ Threshold",cnt("_status","Sesuai Target/Threshold"),indSesuai+" indikator","ready")+
+    card("Ditinjau",cnt("_status","Ditinjau"),"","review")+
+    card("Perhatian",cnt("_status","Perhatian"),"","critical")+
+    card("Capai<br>target",cnt("_tgt_status","Capai target"),indTarget+" indikator","accent")+
   '</div>'+
   '<div class="legendrow"><span class="lbl">Legend</span>'+
     ST_IND.map(s=>'<span class="pill '+s.cls+'"><span class="ic">'+s.ic+'</span>'+s.v+'</span> '+
@@ -566,8 +573,9 @@ function renderAnalisis(){
   '<div class="grid2" style="margin-top:22px">'+
     '<div><div class="slabel" style="margin-top:0">Status indikator per Area Program</div>'+
       '<div class="chartbox">'+chartStack(g5,SER_IND,{pct100:true,labW:138})+legend(SER_IND)+'</div></div>'+
-    '<div><div class="slabel" style="margin-top:0">Endline vs Threshold per Area Program</div>'+
-      '<div class="chartbox">'+chartStack(g6,SER_THR,{pct100:true,labW:138})+legend(SER_THR)+
+    '<div><div class="slabel" style="margin-top:0">Endline vs Threshold per Area Program '+
+      '<span class="hint">jumlah baris</span></div>'+
+      '<div class="chartbox">'+chartStack(g6,SER_THR,{pct100:true,labelCount:true,labW:138})+legend(SER_THR)+
       '<p class="chartnote">Urutan baris sama dengan grafik di sebelah kiri, jadi kedua grafik bisa dibaca berpasangan.</p></div></div>'+
   '</div>'+
 
