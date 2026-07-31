@@ -625,3 +625,11 @@ button.yn.y{background:#E8F1EC;border-color:#9EC6AE;color:#155930}
 button.yn.n{background:var(--f-reference);border-color:var(--rule);color:#A9A6B0}
 button.yn:hover{border-color:var(--orange);color:var(--orange)}
 select.cell.wide{max-width:400px}
+
+/* ---- modal impor ---- */
+.modal textarea#impBox{height:150px}
+.imprep{border:1px solid var(--rule);background:#FCFBFA;padding:10px 12px;margin-top:12px;font-size:11.5px}
+.improw{margin-bottom:6px;line-height:1.6}
+.improw:last-child{margin-bottom:0}
+.improw b{color:var(--midnight)}
+.gobtn:disabled{background:#BEBBC4;border-color:#BEBBC4;cursor:not-allowed}
