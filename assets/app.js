@@ -11,7 +11,7 @@
 const CFG = {
   Cycle:"Target Setting FY27–FY30",
   Stage:"Discussion",
-  Version:"v1.0",
+  Version:"v1.2",
   ImportDate:"31 Jul 2026",
   Owner:"PEARL — Technical Support",
   ReadinessTarget:0.90,
@@ -473,21 +473,17 @@ const SHEETS=[
  {id:"HOME",          tab:"HOME",         c:"#FF5515", title:"AIM+ AREA PROGRAMME TARGET SETTING — DECISION WORKBOOK",
   crumb:()=>"Home", rel:[], render:renderHome},
  {id:"00_MASTER",     tab:"00_MASTER",    c:"#0C7993", title:"MASTER SETUP", write:true,
-  crumb:()=>"Home ▸ Master setup", rel:["HOME","06_DECISIONS","07_DATAQUALITY"], render:renderMaster},
+  crumb:()=>"Home ▸ Master setup", rel:["HOME","01_NATIONAL","08_REFERENCE"], render:renderMaster},
  {id:"01_NATIONAL",   tab:"01_NATIONAL",  c:"#111222", title:"NATIONAL TREND BY AREA PROGRAMME",
   crumb:()=>"Home ▸ National Trend by AP", rel:["02_ZONAL","03_AP"], render:renderNational},
  {id:"02_ZONAL",      tab:"02_ZONAL",     c:"#111222", title:"ZONAL INDICATOR COMPARISON",
   crumb:()=>"Home ▸ National Trend ▸ Zonal Indicator Comparison ▸ <b>"+esc(F.zonal)+"</b>", rel:["01_NATIONAL","03_AP","04_OUTCOME"], render:renderZonal},
  {id:"03_AP",         tab:"03_AP",        c:"#111222", title:"AREA PROGRAMME REVIEW",
-  crumb:()=>"Home ▸ Zonal ▸ Area Programme Review ▸ <b>"+esc(CFG.Sel_AP)+"</b>", rel:["02_ZONAL","06_DECISIONS","05_INDICATOR"], render:renderAP},
+  crumb:()=>"Home ▸ Zonal ▸ Area Programme Review ▸ <b>"+esc(CFG.Sel_AP)+"</b>", rel:["02_ZONAL","05_INDICATOR","04_OUTCOME"], render:renderAP},
  {id:"04_OUTCOME",    tab:"04_OUTCOME",   c:"#111222", title:"OUTCOME REVIEW",
-  crumb:()=>"Home ▸ Outcome Review ▸ <b>"+esc(CFG.Sel_Outcome)+"</b>", rel:["05_INDICATOR","06_DECISIONS"], render:renderOutcome},
+  crumb:()=>"Home ▸ Outcome Review ▸ <b>"+esc(CFG.Sel_Outcome)+"</b>", rel:["05_INDICATOR","03_AP"], render:renderOutcome},
  {id:"05_INDICATOR",  tab:"05_INDICATOR", c:"#111222", title:"INDICATOR REVIEW",
-  crumb:()=>"Home ▸ Indicator Review ▸ <b>"+esc(F.zonal)+"</b> ▸ <b>"+esc(CFG.Sel_AP)+"</b> ▸ <b>"+esc(F.ind)+"</b>", rel:["04_OUTCOME","06_DECISIONS","08_REFERENCE"], render:renderIndicator},
- {id:"06_DECISIONS",  tab:"06_DECISIONS", c:"#155930", title:"DECISION TRACKER", write:true,
-  crumb:()=>"Home ▸ Decision Tracker", rel:["03_AP","02_ZONAL","07_DATAQUALITY"], render:renderDecisions},
- {id:"07_DATAQUALITY",tab:"07_DATAQUALITY",c:"#B10831", title:"DATA QUALITY",
-  crumb:()=>"Home ▸ Data Quality", rel:["05_INDICATOR","06_DECISIONS"], render:renderDQ},
+  crumb:()=>"Home ▸ Indicator Review ▸ <b>"+esc(F.zonal)+"</b> ▸ <b>"+esc(CFG.Sel_AP)+"</b> ▸ <b>"+esc(F.ind)+"</b>", rel:["04_OUTCOME","03_AP","08_REFERENCE"], render:renderIndicator},
  {id:"08_REFERENCE",  tab:"08_REFERENCE", c:"#3F3D4C", title:"REFERENCE",
   crumb:()=>"Home ▸ Reference", rel:["HOME"], render:renderReference}
 ];
@@ -517,7 +513,7 @@ function buildFrames(){
 
   document.getElementById("tabbar").innerHTML =
     SHEETS.map(sh=>'<button class="tab" data-tab="'+sh.id+'"><span class="dot" style="background:'+sh.c+'"></span>'+
-      sh.tab.replace(/_/g,"&nbsp;")+'<span class="bdg'+(sh.id==="06_DECISIONS"?' g':'')+'" data-bdg="'+sh.id+'" hidden></span></button>').join('')
+      sh.tab.replace(/_/g,"&nbsp;")+'</button>').join('')
     + HIDDEN.map(h=>'<button class="tab locked" data-locked="'+h+'">🔒 '+h+'</button>').join('');
 }
 function go(id){
@@ -540,13 +536,7 @@ function paintAll(){
   SHEETS.forEach(s=>{ if(document.getElementById("sh_"+s.id).classList.contains("on")) paint(s.id); });
   badges();
 }
-function badges(){
-  /* the tab strip carries progress, not error counts: the submission is still moving */
-  const setB=(id,v,show)=>{const b=document.querySelector('[data-bdg="'+id+'"]');
-    if(!b)return; b.textContent=v; b.hidden=!show;};
-  setB("07_DATAQUALITY","",false);
-  setB("06_DECISIONS",S.dec.length,S.dec.length>0);
-}
+function badges(){ /* no counters on the tab strip: this view is read for results */ }
 function card(lab,val,sub,cls){
   return '<div class="card '+(cls||"neutral")+'"><div class="lab">'+lab+'</div>'+
     '<div><div class="val">'+val+'</div><div class="sub">'+(sub||"&nbsp;")+'</div></div></div>';
@@ -567,8 +557,6 @@ function renderHome(){
     ["03_AP","03","Area Programme Review","AP Manager · facilitator"],
     ["04_OUTCOME","04","Outcome Review","Sector / technical lead"],
     ["05_INDICATOR","05","Indicator Review","DMEAL · PEARL"],
-    ["06_DECISIONS","06","Decision Tracker","Facilitator",true],
-    ["07_DATAQUALITY","07","Data Quality","DMEAL"],
     ["08_REFERENCE","08","Reference","All users"]
   ];
   return '<div class="slabel">Coverage of this cycle</div>'+
@@ -600,7 +588,7 @@ function renderHome(){
         const here=s.name===CFG.Stage, done=s.n<(STAGES.find(x=>x.name===CFG.Stage)||{n:4}).n;
         return '<div class="stagerow'+(here?' here':done?' done':'')+'"><div class="n">'+s.n+'</div>'+
           '<div><b>'+s.name+'</b> — '+esc(s.desc)+'<br><span class="dim">'+
-          (s.n<=3?'comes in with the AP submission':'recorded on sheet 06')+' · owner '+esc(s.owner)+'</span></div></div>';
+          (s.n<=3?'comes in with the AP submission':'recorded in the review')+' · owner '+esc(s.owner)+'</span></div></div>';
       }).join('')+'</div>'+
       '<p class="tcap">Only sheets 00 and 06 accept typing. Everything else reads the same model, so a decision '+
       'logged once shows up everywhere.</p></div>'+
@@ -861,7 +849,7 @@ function renderAP(){
   const comments=S.dec.filter(d=>d.AP===ap).sort((a,b)=>String(b.Timestamp).localeCompare(String(a.Timestamp))).slice(0,10);
 
   return '<div class="fband"><div class="frow">'+
-      '<div class="fcell"><label>Area programme <span class="dim">— the only unlocked cell outside sheet 06</span></label>'+
+      '<div class="fcell"><label>Area programme <span class="dim">— pick the AP to show</span></label>'+
       '<select data-rf="ap" style="min-width:230px">'+
         ZONALS.map(z=>'<optgroup label="'+z.z+'">'+z.aps.map(a=>
           '<option'+(a[0]===ap?" selected":"")+'>'+a[0]+'</option>').join('')+'</optgroup>').join('')+'</select></div>'+
@@ -893,25 +881,17 @@ function renderAP(){
     '<th class="r">Baseline</th><th class="r">Threshold</th><th class="r">Target LOP</th><th class="r">Proposal</th>'+
     '<th>Status</th><th>Latest decision</th><th></th></tr></thead><tbody>'+body+'</tbody></table></div>'+
 
-  '<div class="slabel">What needs attention in this AP</div>'+
-  '<div class="insights">'+
-    '<p><span class="mk">▸</span><span><b>'+mix.CRITICAL+'</b> indicator'+(mix.CRITICAL===1?"":"s")+
-      ' cannot be discussed until the data is corrected.</span></p>'+
-    '<p><span class="mk">▸</span><span><b>'+missBase+'</b> have no baseline. <b>'+missThr+'</b> have no threshold on record.</span></p>'+
-    '<p><span class="mk">▸</span><span><b>'+mix.MONITOR+'</b> are flagged <i>Monitor Indicator</i> by the AP submission — no target is set this cycle.</span></p>'+
-    '<p><span class="mk">▸</span><span><b>'+s7+' of '+rows.length+'</b> indicators are at Approval stage'+
-      (rows.length?' ('+Math.round(s7/rows.length*100)+'%)':'')+'.</span></p>'+
-  '</div>'+
-
-  '<div class="slabel">Review comments on record <span class="hint">latest first · read-only, written on sheet 06</span></div>'+
+  '<div class="slabel">Decisions on record <span class="hint">latest first · read-only</span></div>'+
   '<div class="tscroll"><table class="gt"><thead><tr><th>Code</th><th>Rev</th><th>Reviewer</th><th>Logged</th>'+
     '<th>Decision</th><th>Reason</th><th>Comment</th></tr></thead><tbody>'+
     (comments.length?comments.map(d=>'<tr><td class="code">'+esc(d.Code)+'</td><td class="c">'+d.Revision+'</td>'+
       '<td>'+esc(d.Reviewer)+'</td><td class="nowrap">'+dmy(d.Timestamp)+'</td><td>'+esc(d.Decision)+'</td>'+
       '<td>'+esc(d.Reason)+'</td><td>'+(d.Comment?esc(d.Comment):'<span class="dim">—</span>')+'</td></tr>').join('')
-      :'<tr><td colspan="7" class="dim">Nothing logged for this AP yet. Open sheet 06 and record the first decision — it will appear here immediately.</td></tr>')+
+      :'<tr><td colspan="7" class="dim">No decisions on record for this AP yet.</td></tr>')+
     '</tbody></table></div>'+
-  '<p class="tcap">Closing loop: read the Status column, switch to <a href="#" data-go="06_DECISIONS">06 Decision Tracker</a>, log the decision, come back. The row updates without a refresh.</p>';
+  '<p class="tcap">Decisions are recorded in the workshop and published with the data. '+
+   'To change what appears here, update <span class="keyprev">data/decisions.js</span> — '+
+   'sheet 00 can write the replacement file for you.</p>';
 }
 
 /* ==================================================================
@@ -1084,126 +1064,6 @@ function renderIndicator(){
       '<td class="r">'+pct(r.Pct_LOP)+'</td><td>'+pill(r.Row_Status)+'</td>'+
       '<td>'+(r.Dec_Decision?esc(r.Dec_Decision):'<span class="dim">—</span>')+'</td></tr>').join('')+
     '</tbody></table></div>';
-}
-
-/* ==================================================================
-   06_DECISIONS  (§6.7) — the only writable surface
-   ================================================================== */
-const DRAFT={Zonal:"",AP:"",Code:"",Decision:"",Reason:"",Comment:"",
-  Reviewer:"",Owner:"",Due_Date:addDays(TODAY,10),Status:"Discussed",Approval_Date:""};
-let VERR={};
-
-function decFiltered(){
-  return S.dec.filter(d=>
-    (F.decZonal==="(All)"||!F.decZonal||d.Zonal===F.decZonal) &&
-    (F.decStatus==="(All)"||d.Status===F.decStatus) &&
-    (F.decOwner==="(All)"||d.Owner===F.decOwner));
-}
-function renderDecisions(){
-  const total=S.dec.length;
-  const open=S.dec.filter(d=>d.Status!=="Approved").length;
-  const overdue=S.dec.filter(d=>d.Status!=="Approved"&&d.Due_Date&&d.Due_Date<TODAY).length;
-  const appr=S.dec.filter(d=>d.Status==="Approved").length;
-  const withDec={}; S.dec.forEach(d=>withDec[d.Row_ID]=1);
-  const noDec=S.master.filter(r=>!withDec[r.Row_ID]).length;
-
-  const reqComment=(DECISION_LIST.find(d=>d.d===DRAFT.Decision)||{}).req==="Yes";
-  const apOpts=apsOf(DRAFT.Zonal);
-  const codeOpts=DRAFT.AP?uniq(byAP(DRAFT.AP).map(r=>r.Code)).sort():[];
-  const rid=(DRAFT.Zonal&&DRAFT.AP&&DRAFT.Code)?DRAFT.Zonal+"|"+DRAFT.AP+"|"+DRAFT.Code:"";
-  const rev=rid?S.dec.filter(d=>d.Row_ID===rid).length+1:1;
-  const exists=rid?S.master.some(r=>r.Row_ID===rid):true;
-  const e=k=>VERR[k]?" bad":"";
-  const log=decFiltered().slice().reverse();
-
-  return '<div class="cards" style="margin-top:16px">'+
-    card("Decisions<br>logged",total,"append-only, all revisions","neutral")+
-    card("Open",open,"not yet approved","review")+
-    card("Overdue",overdue,"past due date","critical")+
-    card("Approved",appr,"stage 7","ready")+
-    card("Rows with<br>no decision",noDec,"of "+S.master.length+" rows","teal")+
-  '</div>'+
-
-  '<div class="fband"><div class="frow">'+
-    slicer("Slicer · Zonal","decZonal",[{v:"(All)",n:S.dec.length}].concat(
-      ZONALS.map(z=>({v:z.z,n:S.dec.filter(d=>d.Zonal===z.z).length}))),F.decZonal||"(All)",false)+
-    slicer("Slicer · Status","decStatus",[{v:"(All)",n:S.dec.length}].concat(
-      STATUS_LIST.map(s=>({v:s,n:S.dec.filter(d=>d.Status===s).length}))),F.decStatus,false)+
-    slicer("Slicer · Owner","decOwner",[{v:"(All)",n:S.dec.length}].concat(
-      uniq(S.dec.map(d=>d.Owner)).sort().map(o=>({v:o,n:S.dec.filter(d=>d.Owner===o).length}))),F.decOwner,false)+
-  '</div><div class="fnote">In the Excel build the slicers filter the summary cards; the log itself is filtered with the column arrows. '+
-   'Here they do both — but the rule that matters is unchanged: <b>a revision is a new row, never an edit to an old one.</b></div></div>'+
-
-  '<div class="slabel">Log a decision <span class="hint">the closing loop — this is the only place the workbook accepts typing</span></div>'+
-  '<div class="form"><div class="fgrid">'+
-    fg("Zonal","zonal-sel",'<select data-d="Zonal">'+ZONALS.map(z=>'<option'+(z.z===DRAFT.Zonal?" selected":"")+'>'+z.z+'</option>').join('')+'</select>',"Drives the AP list",false)+
-    fg("Area programme","ap-sel",'<select data-d="AP"'+(apOpts.length?"":" disabled")+'><option value="">— select —</option>'+
-      apOpts.map(a=>'<option'+(a===DRAFT.AP?" selected":"")+'>'+a+'</option>').join('')+'</select>',"Dependent on Zonal",true,e("AP"))+
-    fg("Indicator code","code-sel",'<select data-d="Code"'+(codeOpts.length?"":" disabled")+'><option value="">'+
-      (DRAFT.AP?"— select —":"Select Zonal and AP first")+'</option>'+
-      codeOpts.map(c=>'<option'+(c===DRAFT.Code?" selected":"")+'>'+c+' — '+esc(IND[c]?IND[c].short:"")+'</option>').join('')+'</select>',
-      "Dependent on AP",true,e("Code"))+
-    fg("Decision","dec-sel",'<select data-d="Decision"><option value="">— select —</option>'+
-      DECISION_LIST.map(d=>'<option'+(d.d===DRAFT.Decision?" selected":"")+'>'+d.d+'</option>').join('')+'</select>',
-      "Error alert: Stop",true,e("Decision"))+
-    fg("Reason","rsn-sel",'<select data-d="Reason"><option value="">— select —</option>'+
-      REASONS.map(r=>'<option'+(r[0]===DRAFT.Reason?" selected":"")+'>'+r[0]+'</option>').join('')+'</select>',
-      "Standard reason codes",true,e("Reason"))+
-    fg("Reviewer","rev-sel",'<select data-d="Reviewer"><option value="">— select —</option>'+
-      ROLES.filter(r=>REVIEWER_ROLES.indexOf(r[1])>=0).map(r=>'<option'+(r[0]===DRAFT.Reviewer?" selected":"")+'>'+
-        r[0]+' · '+r[1]+'</option>').join('')+'</select>',"lstReviewer",true,e("Reviewer"))+
-    fg("Owner","own-sel",'<select data-d="Owner"><option value="">— select —</option>'+
-      ROLES.map(r=>'<option'+(r[0]===DRAFT.Owner?" selected":"")+'>'+r[0]+' · '+r[1]+'</option>').join('')+'</select>',
-      "Who does the follow-up",true,e("Owner"))+
-    fg("Due date","due-in",'<input type="date" data-d="Due_Date" value="'+esc(DRAFT.Due_Date)+'">',
-      "Warning if in the past",true,e("Due_Date"))+
-    fg("Status","st-sel",'<select data-d="Status">'+STATUS_LIST.map(s=>'<option'+(s===DRAFT.Status?" selected":"")+'>'+s+'</option>').join('')+'</select>',
-      "Approved sets stage 7",true)+
-    fg("Approval date","apd-in",'<input type="date" data-d="Approval_Date" value="'+esc(DRAFT.Approval_Date)+'"'+
-      (DRAFT.Status==="Approved"?"":" disabled")+'>',
-      DRAFT.Status==="Approved"?"Required when approved":"Only when status is Approved",DRAFT.Status==="Approved",e("Approval_Date"))+
-    '<div class="fg wide'+e("Comment")+'"><label>Comment '+(reqComment?'<span class="req">*</span>':'')+
-      '</label><textarea data-d="Comment" rows="2" maxlength="255" placeholder="'+
-      (reqComment?esc(DRAFT.Decision)+' requires a comment: say what has to change, and by when.':'Optional for this decision type.')+
-      '">'+esc(DRAFT.Comment)+'</textarea><div class="hlp">255 characters. '+
-      (reqComment?'<b style="color:var(--red)">Required for '+esc(DRAFT.Decision)+'</b>':'Not required for this decision')+'</div></div>'+
-  '</div>'+
-  '<div class="formfoot">'+
-    '<button class="gobtn" id="btnLog">Log decision</button>'+
-    '<span class="keyprev">Row_ID '+(rid?esc(rid):'—')+' &nbsp;·&nbsp; Revision '+rev+' &nbsp;·&nbsp; Dec_Key '+(rid?esc(rid)+"|"+rev:'—')+'</span>'+
-    (rid&&!exists?'<span class="vmsg">▲ This key is not in tblMaster — it would vanish from every report</span>':'')+
-    (VERR.msg?'<span class="vmsg">▲ '+esc(VERR.msg)+'</span>':'')+
-    '<span class="appendonly">Revision '+rev+' supersedes earlier revisions in the reports and keeps them in the log.</span>'+
-  '</div></div>'+
-
-  '<div class="slabel">tblDecision <span class="hint">'+log.length+' of '+total+
-    ' rows shown · newest first · nothing can be deleted</span></div>'+
-  '<div class="tscroll"><table class="gt"><thead><tr><th>Dec_ID</th><th>Logged</th><th>Zonal</th><th>AP</th>'+
-    '<th>Code</th><th class="c">Rev</th><th>Decision</th><th>Reason</th><th>Reviewer</th><th>Owner</th>'+
-    '<th>Due</th><th>Status</th><th>Approved</th><th>Comment</th></tr></thead><tbody>'+
-    (log.length?log.map(d=>{
-      const i=S.dec.indexOf(d), late=d.Status!=="Approved"&&d.Due_Date&&d.Due_Date<TODAY;
-      const stc=d.Status==="Approved"?'style="background:var(--f-ready);color:var(--green);font-weight:700"':
-        d.Status==="Revision Requested"?'style="background:var(--f-review);color:var(--amber);font-weight:700"':
-        d.Status==="Deferred"?'style="background:var(--f-reference)"':'';
-      const dupWarn=!S.master.some(r=>r.Row_ID===d.Row_ID);
-      return '<tr><td class="code">D-'+String(i+1).padStart(4,"0")+'</td><td class="nowrap dim">'+dmy(d.Timestamp)+'</td>'+
-        '<td>'+esc(d.Zonal)+'</td><td>'+esc(d.AP)+'</td>'+
-        '<td class="code'+(dupWarn?' miss':'')+'" style="text-align:left">'+esc(d.Code)+(dupWarn?' ▲':'')+'</td>'+
-        '<td class="c">'+d.Revision+'</td><td>'+esc(d.Decision)+'</td><td class="dim">'+esc(d.Reason)+'</td>'+
-        '<td>'+esc(d.Reviewer)+'</td><td>'+esc(d.Owner)+'</td>'+
-        '<td class="nowrap'+(late?' miss':'')+'" style="text-align:left">'+dmy(d.Due_Date)+'</td>'+
-        '<td '+stc+'>'+esc(d.Status)+'</td><td class="nowrap dim">'+(d.Approval_Date?dmy(d.Approval_Date):"—")+'</td>'+
-        '<td>'+(d.Comment?esc(d.Comment):'<span class="dim">—</span>')+'</td></tr>';
-    }).join('')
-    :'<tr><td colspan="14" class="dim">The log is empty under this filter. Clear the slicers, or record the first decision above.</td></tr>')+
-    '</tbody></table></div>'+
-  '<p class="tcap">A code shaded <span style="background:var(--f-critical);color:var(--red);padding:1px 4px">red ▲</span> '+
-   'is a decision logged against a row that is not in the submission — the one error that would otherwise vanish silently (§6.7 ·10).</p>';
-}
-function fg(label,id,ctrl,help,req,bad){
-  return '<div class="fg'+(bad||"")+'"><label>'+label+(req?' <span class="req">*</span>':'')+'</label>'+
-    ctrl+'<div class="hlp">'+help+'</div></div>';
 }
 
 /* ==================================================================
@@ -1424,124 +1284,15 @@ function renderMaster(){
 }
 
 /* ==================================================================
-   07_DATAQUALITY  (§6.8)
-   ================================================================== */
-function renderDQ(){
-  const n=S.master.length, gate=importGate();
-  const clean=countIf(r=>r.Flag_Count===0), flagged=n-clean;
-  let rows=S.master;
-  if(F.dqZonal&&F.dqZonal!=="(All)") rows=rows.filter(r=>r.Zonal===F.dqZonal);
-  const fl=FLAGS.map(f=>({k:f[0],label:f[1],short:f[2],v:rows.reduce((a,r)=>a+r[f[0]],0)}));
-  const sorted=fl.slice().sort((a,b)=>b.v-a.v);
-  const apAgg=uniq(rows.map(r=>r.AP)).map(ap=>{
-    const rs=rows.filter(r=>r.AP===ap);
-    return {ap:ap,z:zoneOfAP(ap),n:rs.length,
-      f:FLAGS.map(f=>rs.reduce((a,r)=>a+r[f[0]],0)),
-      flagged:rs.filter(r=>r.Flag_Count>0).length};
-  }).sort((a,b)=>b.flagged/b.n-a.flagged/a.n);
-  const indAgg=uniq(rows.map(r=>r.Code)).map(c=>{
-    const rs=rows.filter(r=>r.Code===c);
-    return {c:c,short:IND[c]?IND[c].short:c,n:rs.length,
-      f:FLAGS.map(f=>rs.reduce((a,r)=>a+r[f[0]],0)),
-      flagged:rs.filter(r=>r.Flag_Count>0).length};
-  }).sort((a,b)=>b.flagged-a.flagged).slice(0,14);
-  const corr=rows.filter(r=>r.Flag_Count>0).slice(0,60);
-  const flagNames=r=>FLAGS.filter(f=>r[f[0]]).map(f=>f[1]).join(", ");
-
-  return '<div class="health">'+
-    '<div class="gate '+(gate==="IMPORT OK"?"ok":"no")+'">'+(gate==="IMPORT OK"?"● ":"▲ ")+gate+'</div>'+
-    '<div class="m">Rows<b>'+n0(n)+'</b></div>'+
-    '<div class="m">Clean rows<b style="color:var(--green)">'+n0(clean)+'</b></div>'+
-    '<div class="m">Flagged<b style="color:var(--red)">'+n0(flagged)+'</b></div>'+
-    '<div class="m">Flags raised<b>'+n0(S.master.reduce((a,r)=>a+r.Flag_Count,0))+'</b></div>'+
-    '<div class="m" style="margin-left:auto">'+
-      '<label style="font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase">Slicer · Zonal</label>'+
-      '<select data-rf="dqzonal" style="border:1px solid #A9A6B0;padding:5px 8px;background:#fff;border-radius:2px">'+
-      ["(All)"].concat(ZONALS.map(z=>z.z)).map(z=>'<option'+(z===(F.dqZonal||"(All)")?" selected":"")+'>'+z+'</option>').join('')+
-      '</select></div></div>'+
-    (gate!=="IMPORT OK"?'<p class="tcap" style="color:var(--red);font-weight:600">'+
-      'The import gate must read IMPORT OK before this workbook is distributed (§4.4). '+
-      flagSum("Chk_Duplicate")+' rows carry a duplicate Row_ID — resolve them at source, or document the exception in writing. '+
-      (S.demo?'<button class="ghost noprint" id="btnDedupe" style="margin-left:8px;font-weight:400">'+
-        'Resolve duplicates and clear the gate</button>':'')+'</p>':'')+
-
-  '<div class="cards" style="margin-top:16px">'+
-    fl.map(f=>card(f.short,f.v,f.v?"rows to correct":"none","critical")).join('')+
-  '</div>'+
-
-  '<div class="slabel">Where to start <span class="hint">chtDQ_Flags · flag totals, largest first</span></div>'+
-  '<div class="chartbox">'+chartFlags(sorted.map(f=>({label:f.label,v:f.v})))+'</div>'+
-
-  '<div class="slabel">Flags by area programme <span class="hint">pvtDQ_AP · worst share of flagged rows first</span></div>'+
-  '<div class="tscroll"><table class="gt"><thead><tr><th>Zonal</th><th>Area programme</th><th class="r">Rows</th>'+
-    FLAGS.map(f=>'<th class="r">'+f[2].replace("<br>"," ").replace("MISSING ","").replace("DUPLICATE","Dupe").replace("RANGE","Range")+'</th>').join('')+
-    '<th class="r">Flagged</th><th>Share</th></tr></thead><tbody>'+
-    apAgg.map(a=>'<tr><td class="dim">'+esc(a.z)+'</td><td><b>'+esc(a.ap)+'</b></td><td class="r">'+a.n+'</td>'+
-      a.f.map(v=>'<td class="r'+(v>0?' crit':' dim')+'">'+v+'</td>').join('')+
-      '<td class="r'+(a.flagged>0?' crit':'')+'">'+a.flagged+'</td><td>'+bar(a.flagged/a.n,true)+'</td></tr>').join('')+
-    '</tbody></table></div>'+
-
-  '<div class="slabel">Flags by indicator <span class="hint">pvtDQ_Ind · top 14</span></div>'+
-  '<div class="tscroll"><table class="gt"><thead><tr><th>Code</th><th>Indicator</th><th class="r">Rows</th>'+
-    FLAGS.map(f=>'<th class="r">'+f[2].replace("<br>"," ").replace("MISSING ","").replace("DUPLICATE","Dupe").replace("RANGE","Range")+'</th>').join('')+
-    '<th class="r">Flagged</th></tr></thead><tbody>'+
-    indAgg.map(a=>'<tr><td class="code">'+esc(a.c)+'</td><td>'+esc(a.short)+'</td><td class="r">'+a.n+'</td>'+
-      a.f.map(v=>'<td class="r'+(v>0?' crit':' dim')+'">'+v+'</td>').join('')+
-      '<td class="r'+(a.flagged>0?' crit':'')+'">'+a.flagged+'</td></tr>').join('')+
-    '</tbody></table></div>'+
-
-  '<div class="slabel">Correction list <span class="hint">every flagged row'+
-    (rows.filter(r=>r.Flag_Count>0).length>60?' · first 60 of '+rows.filter(r=>r.Flag_Count>0).length:'')+
-    ' · print this and carry it into the cleaning session</span></div>'+
-  '<div class="tscroll"><table class="gt"><thead><tr><th>Zonal</th><th>AP</th><th>Code</th><th>Indicator</th>'+
-    '<th class="c">Flags</th><th>What is wrong</th><th>Owner</th><th>Status</th></tr></thead><tbody>'+
-    corr.map(r=>'<tr><td class="dim">'+esc(r.Zonal)+'</td><td>'+esc(r.AP)+'</td><td class="code">'+esc(r.Code)+'</td>'+
-      '<td>'+esc(r.Indicator_Short)+'</td><td class="c crit">'+r.Flag_Count+'</td>'+
-      '<td style="color:var(--red)">'+esc(flagNames(r))+'</td>'+
-      '<td>'+(r.Dec_Owner?esc(r.Dec_Owner):'<span class="dim">unassigned</span>')+'</td>'+
-      '<td>'+(r.Dec_Status?esc(r.Dec_Status):'<span class="dim">Not started</span>')+'</td></tr>').join('')+
-    '</tbody></table></div>'+
-  '<p class="tcap">Owners are assigned on <a href="#" data-go="06_DECISIONS">06 Decision Tracker</a> with decision '+
-   '<i>Revise data</i>. Export the list from the toolbar to send it to the APs (§9.3).</p>';
-}
-
-/* ==================================================================
    08_REFERENCE  (§6.9)
    ================================================================== */
-const FAQ=[
- ["Q01","Kenapa sel kosong, bukan nol?","Why is a cell blank rather than zero?",
-  "Kosong berarti <b>tidak ada data yang dikirim</b>; nol berarti nilainya benar-benar nol. Keduanya dibedakan sejak tahap import (§4.2 langkah 4), karena baseline 0% dan baseline yang belum diukur menuntut tindakan yang berbeda."],
- ["Q02","Apa arti <i>Monitor Indicator</i> dan apa yang harus AP lakukan?","What does Monitor Indicator mean and what should the AP do?",
-  "Baseline sudah melewati threshold, sehingga AP tidak menetapkan target baru siklus ini. AP tetap mengumpulkan data dan melaporkannya; indikator tidak dihapus dari ITT."],
- ["Q03","Kenapa saya tidak bisa mengetik di sheet 01–05?","Why can I not type on sheets 01–05?",
-  "Sheet 01–05 adalah pembacaan dari satu model data. Semua keputusan masuk melalui sheet 06 supaya setiap perubahan punya jejak audit: siapa, kapan, alasan apa."],
- ["Q04","Bagaimana merevisi keputusan yang sudah dicatat?","How do I revise a decision I already logged?",
-  "Catat baris baru untuk Row_ID yang sama. Revision naik otomatis dan laporan memakai revisi terakhir; revisi sebelumnya tetap tersimpan. <b>Jangan mengubah baris lama.</b>"],
- ["Q05","Dari mana threshold berasal?","Where does the threshold come from?",
-  "Dari tblThreshold di sheet ini — setiap nilai punya sumber dan tanggal persetujuan. Jika kolom berbunyi TBC, threshold belum ada dan indikator tidak bisa masuk tahap 2."],
- ["Q06","Apa maksud <i>Stage 4 of 7</i>?","What does Stage 4 of 7 refer to?",
-  "Tahap siklus di tingkat workbook, disetel PEARL di SETTINGS. Setiap baris juga punya tahapnya sendiri (1–7); Approval Progress adalah proporsi baris yang sudah di tahap 7."],
- ["Q07","AP saya tidak ada di dropdown — apa yang harus saya lakukan?","My AP is missing from the dropdown — what do I do?",
-  "AP diambil dari tblAP, bukan dari data submission. Hubungi PEARL untuk menambahkan AP ke register; menambah baris data tanpa register akan tertangkap sebagai kunci tidak dikenal di sheet 06."],
- ["Q08","Kenapa threshold indikator saya tertulis TBC?","Why does my indicator show TBC for threshold?",
-  "Sektor teknis belum menetapkan nilainya. Indikator boleh dibahas, tetapi tidak boleh disetujui — Row_Status akan tetap CRITICAL sampai threshold masuk."],
- ["Q09","Siapa yang menyetujui target?","Who approves a target?",
-  "PEARL Lead, setelah Technical Review sektor. Persetujuan sah bila Status = Approved <b>dan</b> Approval Date terisi (§1.3 tahap 7)."],
- ["Q10","Bagaimana mencetak dossier AP saya?","How do I export my AP's dossier?",
-  "Buka 03_AP, pilih AP, lalu Print. Halaman sudah dibatasi 30 baris tetap supaya selalu satu halaman A4 landscape, dengan nama AP ikut tercetak di baris breadcrumb."],
- ["Q11","Apa bedanya Baseline dan LOP?","What is the difference between Baseline and LOP?",
-  "Baseline adalah kondisi awal siklus (FY26). LOP (Life of Programme) adalah nilai yang diharapkan pada akhir FY30. Delta adalah jarak antara keduanya, bukan target itu sendiri."],
- ["Q12","Ke siapa saya melaporkan kesalahan data?","Who do I contact about a data error?",
-  "DMEAL zonal Anda, dengan Row_ID dari sheet 05. Kesalahan yang sudah masuk daftar koreksi di 07 sudah diketahui — cukup konfirmasi angka penggantinya."]
-];
 function renderReference(){
-  const jump=[["ref_status","Status legend"],["ref_stage","Stage legend"],["ref_ind","Indicator definitions"],
-    ["ref_thr","Threshold reference"],["ref_calc","Calculation guidance"],["ref_faq","FAQ"],["ref_ver","Version history"],["ref_qa","QA checklist"]];
+  const jump=[["ref_status","Status legend"],["ref_stage","Stage legend"],
+    ["ref_ind","Indicator definitions"],["ref_thr","Threshold reference"],["ref_ver","Version history"]];
   return '<div class="jump"><span>On this sheet</span>'+
-    jump.map(j=>'<a href="#" data-jump="'+j[0]+'">▸ '+j[1]+'</a>').join('')+
-    '<span style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400" class="dim">In Excel, Alt+← returns you to where you came from.</span></div>'+
+    jump.map(j=>'<a href="#" data-jump="'+j[0]+'">▸ '+j[1]+'</a>').join('')+'</div>'+
 
-  '<div class="slabel" id="ref_status">Status legend <span class="hint">the whole workbook resolves to these five values — there is no sixth</span></div>'+
+  '<div class="slabel" id="ref_status">Status legend <span class="hint">five values, and no sixth</span></div>'+
   '<div class="legendbox">'+STATUS.map(s=>'<div class="lrow"><span class="pill '+s.cls+'"><span class="ic">'+s.ic+'</span></span>'+
     '<span class="nm" style="color:var(--'+({READY:"green","NEEDS REVIEW":"amber",MONITOR:"burnt",CRITICAL:"red",REFERENCE:"grey"})[s.s]+')">'+
     s.s+'</span><span>'+s.desc+' · <span class="dim">'+countIf(r=>r.Row_Status===s.s)+' rows now</span></span></div>').join('')+'</div>'+
@@ -1551,17 +1302,17 @@ function renderReference(){
     '<div><b>'+s.name+'</b> — '+esc(s.desc)+'<br><span class="dim">Owner: '+esc(s.owner)+' · '+
     countIf(r=>r.Stage===s.n)+' rows at this stage</span></div></div>').join('')+'</div>'+
 
-  '<div class="slabel" id="ref_ind">Indicator definitions <span class="hint">tblIndicator · '+INDICATORS.length+' rows · printable annex</span></div>'+
+  '<div class="slabel" id="ref_ind">Indicator definitions <span class="hint">'+INDICATORS.length+' indicators · printable annex</span></div>'+
   '<div class="tscroll"><table class="gt"><thead><tr><th>Code</th><th>Outcome</th><th>Indicator</th>'+
     '<th>Numerator</th><th>Denominator</th><th>Source</th><th class="c">Dir</th></tr></thead><tbody>'+
     INDICATORS.map(i=>'<tr><td class="code">'+esc(i.code)+'</td><td class="dim nowrap">'+esc(i.oc)+'</td>'+
       '<td>'+esc(i.ind)+'</td><td class="dim">'+esc(i.numdef)+'</td><td class="dim">'+esc(i.dendef)+'</td>'+
       '<td class="dim">'+esc(i.src)+'</td><td class="c">'+(i.dir===-1?'↓':'↑')+'</td></tr>').join('')+
     '</tbody></table></div>'+
-  '<p class="tcap">↑ higher is better · ↓ reduction indicator: a proposal above the baseline is a deterioration, not an ambition. '+
-   'Four of the reason codes exist for exactly this misreading.</p>'+
+  '<p class="tcap">↑ higher is better · ↓ reduction indicator: a target above the baseline is a deterioration, '+
+   'not an ambition. Every comparison on sheets 01 and 02 is adjusted for this.</p>'+
 
-  '<div class="slabel" id="ref_thr">Threshold reference <span class="hint">tblThreshold</span></div>'+
+  '<div class="slabel" id="ref_thr">Threshold reference</div>'+
   '<div class="tscroll"><table class="gt"><thead><tr><th>Code</th><th>Indicator</th><th class="r">Threshold</th>'+
     '<th>Source</th><th>Approved by</th><th>Approved</th></tr></thead><tbody>'+
     INDICATORS.map(i=>'<tr><td class="code">'+esc(i.code)+'</td><td>'+esc(i.short)+'</td>'+
@@ -1570,86 +1321,16 @@ function renderReference(){
       '<td class="nowrap dim">'+(i.thr==null?'—':'12 Jun 2026')+'</td></tr>').join('')+
     '</tbody></table></div>'+
 
-  '<div class="slabel" id="ref_calc">Calculation guidance</div>'+
-  '<div class="notes"><dl style="margin:0">'+
-    '<dt>What this workbook does</dt><dd>It renders what the AP submitted and records what the review decided. '+
-      '<b>No target value is calculated here.</b> Every formula in the file is presentation-layer or validation-layer (§0).</dd>'+
-    '<dt>Baseline</dt><dd>Numerator ÷ denominator from the FY26 measurement, stored as a fraction and displayed to one decimal. '+
-      'A missing denominator invalidates the proportion, which is why it is a blocking flag rather than a warning.</dd>'+
-    '<dt>Threshold</dt><dd>The externally set level the indicator is measured against — a global aspiration, a national standard, '+
-      'or a model benchmark. It is not negotiated in the workshop; it is looked up.</dd>'+
-    '<dt>Target (LOP)</dt><dd>The AP\u2019s proposed FY30 value. The comparison that matters is baseline → threshold → proposal, '+
-      'in that order. Reading the proposal before the threshold is the most common workshop error.</dd>'+
-    '<dt>Delta and AP proposal</dt><dd>Both are as submitted. The workbook re-displays them, it does not re-derive them, '+
-      'so a mismatch between delta and the two proportions is visible rather than silently corrected.</dd>'+
-  '</dl></div>'+
-
-  '<div class="slabel" id="ref_faq">Frequently asked questions <span class="hint">Bahasa Indonesia, dengan judul Inggris · draft for PEARL to confirm</span></div>'+
-  '<div class="faqgrid">'+FAQ.map(q=>'<div class="faq"><div class="q">'+q[0]+' · '+q[1]+'</div>'+
-    '<div class="qen">'+esc(q[2])+'</div><div class="a">'+q[3]+'</div></div>').join('')+'</div>'+
-
   '<div class="slabel" id="ref_ver">Version history</div>'+
-  '<div class="tscroll"><table class="gt"><thead><tr><th>Version</th><th>Date</th><th>Change</th><th>Author</th><th>Approved by</th></tr></thead><tbody>'+
-    '<tr><td class="code">v1.0</td><td class="nowrap">31 Jul 2026</td><td>First build against the FY27–30 specification. '+
-      'Nine visible sheets, one status vocabulary, append-only decision log.</td><td>Excel Developer</td><td>PEARL</td></tr>'+
-    '<tr><td class="code">v0.9</td><td class="nowrap">28 Jul 2026</td><td>Data model and page frame only, for review.</td><td>Excel Developer</td><td>—</td></tr>'+
+  '<div class="tscroll"><table class="gt"><thead><tr><th>Version</th><th>Date</th><th>Change</th><th>Author</th></tr></thead><tbody>'+
+    '<tr><td class="code">v1.2</td><td class="nowrap">31 Jul 2026</td><td>World Vision header. Access code. '+
+      'Decision tracker and data quality sheets withdrawn — the site reads for results, not for corrections.</td><td>PEARL</td></tr>'+
+    '<tr><td class="code">v1.1</td><td class="nowrap">31 Jul 2026</td><td>Home reduced to coverage. '+
+      'National sheet became the trend across APs; zonal sheet became the comparison between indicators.</td><td>PEARL</td></tr>'+
+    '<tr><td class="code">v1.0</td><td class="nowrap">31 Jul 2026</td><td>First build.</td><td>PEARL</td></tr>'+
     '</tbody></table></div>'+
-  '<p class="tcap">Never distribute two files with the same version string. Minor increments on data re-import, major on structural change (§10.2).</p>'+
-
-  '<div class="slabel" id="ref_qa">QA checklist before distribution '+
-    '<span class="hint">§10.3 · evaluated live · no file is distributed until all twenty pass</span></div>'+
-  (()=>{const q=qaChecks(),pass=q.filter(x=>x[2]==="pass").length,fail=q.filter(x=>x[2]==="fail").length,man=q.filter(x=>x[2]==="manual").length;
-   return '<div class="health" style="margin-top:0"><div class="gate '+(fail?"no":"ok")+'">'+(fail?"▲ "+fail+" CHECK"+(fail>1?"S":"")+" FAILING":"● ALL AUTOMATED CHECKS PASS")+'</div>'+
-    '<div class="m">Passing<b style="color:var(--green)">'+pass+'</b></div>'+
-    '<div class="m">Failing<b style="color:var(--red)">'+fail+'</b></div>'+
-    '<div class="m">Need a human<b>'+man+'</b></div></div>'+
-   '<div class="tscroll" style="margin-top:10px"><table class="gt"><thead><tr><th>#</th><th>Check</th><th>Result</th><th>Evidence</th></tr></thead><tbody>'+
-   q.map(x=>'<tr><td class="dim">'+x[0]+'</td><td>'+x[1]+'</td><td>'+
-     (x[2]==="pass"?'<span class="pill p-READY"><span class="ic">●</span>PASS</span>':
-      x[2]==="fail"?'<span class="pill p-CRITICAL"><span class="ic">▲</span>FAIL</span>':
-      '<span class="pill p-NEEDSREVIEW"><span class="ic">◆</span>MANUAL</span>')+
-     '</td><td class="dim">'+esc(x[3])+'</td></tr>').join('')+'</tbody></table></div>'+
-   '<p class="tcap">Checks 10 and 18 cannot be settled by data alone — someone has to look at a print preview and at a revision chain. '+
-   'Everything else is answered from the model, so the checklist is never out of date.</p>';})();
-}
-
-
-/* §10.3 — the twenty distribution checks, evaluated live where the data can answer them */
-function qaChecks(){
-  const m=S.master, n=m.length;
-  const mix=statusMix(m), five=Object.values(mix).reduce((a,b)=>a+b,0)===n;
-  const nan=m.filter(r=>["Pct_Base","Pct_LOP","Threshold","Num_Base","Den_Base"]
-    .some(k=>typeof r[k]==="number"&&!isFinite(r[k]))).length;
-  const maxAP=Math.max.apply(null,uniq(m.map(r=>r.AP)).map(a=>byAP(a).length));
-  const dropdownOK=AP_LIST.every(a=>uniq(byAP(a.ap).map(r=>r.Code)).length>0);
-  const revChain=(()=>{const c={};S.dec.forEach(d=>c[d.Row_ID]=(c[d.Row_ID]||0)+1);
-    const k=Object.keys(c).find(x=>c[x]>1); if(!k)return null;
-    const rows=S.dec.filter(d=>d.Row_ID===k), last=rows[rows.length-1];
-    const master=m.find(r=>r.Row_ID===k);
-    return master&&master.Dec_Status===last.Status&&rows.length>1;})();
-  const P="pass",X="fail",H="manual";
-  return [
-   [1,"07_DATAQUALITY reads IMPORT OK",importGate()==="IMPORT OK"?P:X,importGate()],
-   [2,"No duplicate Row_ID, or documented in writing",flagSum("Chk_Duplicate")===0?P:X,flagSum("Chk_Duplicate")+" rows"],
-   [3,"Every Row_Status resolves to one of exactly five values",five?P:X,n+" rows accounted for"],
-   [4,"No error values anywhere in the workbook",nan===0?P:X,nan?nan+" non-finite numbers":"clean"],
-   [5,"All nine header bands show the same cycle, stage and version",P,"one source: SETTINGS"],
-   [6,"All eight HOME links land on the intended sheet",P,"routed through one navigator"],
-   [7,"Every breadcrumb updates when its filter changes",P,"breadcrumbs read the filter cells"],
-   [8,"Refresh All completes with no layout shift",P,"fixed footprints; nothing reflows"],
-   [9,"Every slicer is connected to every pivot in its spec",P,"one shared filter state"],
-   [10,"Every sheet previews at one page wide",H,"check print preview"],
-   [11,"03_AP prints on one page for the AP with the most rows",maxAP<=30?P:X,"largest AP has "+maxAP+" rows, block holds 30"],
-   [12,"Greyscale print test: every status distinguishable by icon",P,"each status carries ● ◆ ◧ ▲ –"],
-   [13,"Protected sheets reject typing outside unlocked cells",P,"only sheet 06 and two selectors accept input"],
-   [14,"06_DECISIONS permits insert and rejects delete",P,"no delete affordance exists"],
-   [15,"Hidden sheets cannot be unhidden without PEARL-REF",P,"data tabs are locked"],
-   [16,"Dependent dropdowns work for all APs, including names with spaces",dropdownOK?P:X,AP_LIST.length+" APs resolve"],
-   [17,"A logged decision propagates to sheets 01–05",S.dec.length>0&&countIf(r=>r.Stage===7)>0?P:X,S.dec.length+" decisions, "+countIf(r=>r.Stage===7)+" at stage 7"],
-   [18,"Revision 2 supersedes revision 1 and both stay in the log",revChain===null?H:(revChain?P:X),revChain===null?"log no revision chain yet":"latest revision wins"],
-   [19,"File opens on HOME, top-left, at 100%",P,"HOME is the landing sheet"],
-   [20,"File size under 15 MB",P,"single file, well under"]
-  ];
+  '<p class="tcap">Never publish two versions with the same string. Minor increments on a data change, '+
+   'major on a structural one.</p>';
 }
 
 /* ==================================================================
@@ -1696,7 +1377,7 @@ function wire(id,el){
   el.querySelectorAll("[data-clear]").forEach(b=>b.onclick=()=>{
     if(b.dataset.clear==="status") F.status=[]; paint(id);
   });
-  /* 06_DECISIONS form */
+  /* 00_MASTER form fields */
   el.querySelectorAll("[data-d]").forEach(ctl=>{
     const k=ctl.dataset.d;
     const h=()=>{
@@ -1712,7 +1393,6 @@ function wire(id,el){
     ctl.tagName==="TEXTAREA"?ctl.oninput=h:ctl.onchange=h;
   });
   if(id==="00_MASTER") wireMaster(el,id);
-  const bl=el.querySelector("#btnLog"); if(bl) bl.onclick=logDecision;
   const bd=el.querySelector("#btnDedupe"); if(bd) bd.onclick=()=>{
     const seen={},keep=[],dropped=[];
     S.master.forEach(r=>{ if(seen[r.Row_ID]){dropped.push(r.Row_ID);} else {seen[r.Row_ID]=1;keep.push(r);} });
@@ -1720,39 +1400,6 @@ function wire(id,el){
     toast('Removed <b>'+dropped.length+'</b> duplicate row'+(dropped.length===1?'':'s')+
       ' — first occurrence kept. Import gate now reads <b>'+importGate()+'</b>.');
   };
-}
-
-function logDecision(){
-  VERR={};
-  const need=["AP","Code","Decision","Reason","Reviewer","Owner","Due_Date"];
-  need.forEach(k=>{if(!DRAFT[k])VERR[k]=1;});
-  const rd=DECISION_LIST.find(d=>d.d===DRAFT.Decision);
-  if(rd&&rd.req==="Yes"&&!DRAFT.Comment.trim()) VERR.Comment=1;
-  if(DRAFT.Status==="Approved"&&!DRAFT.Approval_Date) VERR.Approval_Date=1;
-  const rid=DRAFT.Zonal+"|"+DRAFT.AP+"|"+DRAFT.Code;
-  if(DRAFT.AP&&DRAFT.Code&&!S.master.some(r=>r.Row_ID===rid)) VERR.Code=1;
-  if(Object.keys(VERR).length){
-    VERR.msg = VERR.Comment ? "This decision type requires a comment."
-      : VERR.Approval_Date ? "Approved needs an approval date."
-      : VERR.Code&&DRAFT.Code ? "That indicator is not in this AP\u2019s submission."
-      : "Fill the fields marked with an asterisk.";
-    paint("06_DECISIONS"); return;
-  }
-  const rev=S.dec.filter(d=>d.Row_ID===rid).length+1;
-  S.dec.push({Timestamp:TODAY+" "+new Date().toTimeString().slice(0,5),
-    Zonal:DRAFT.Zonal,AP:DRAFT.AP,Code:DRAFT.Code,Row_ID:rid,Revision:rev,
-    Decision:DRAFT.Decision,Reason:DRAFT.Reason,Comment:DRAFT.Comment.trim(),
-    Reviewer:DRAFT.Reviewer,Owner:DRAFT.Owner,Due_Date:DRAFT.Due_Date,
-    Status:DRAFT.Status,Approval_Date:DRAFT.Status==="Approved"?DRAFT.Approval_Date:""});
-  const keep={Zonal:DRAFT.Zonal,AP:DRAFT.AP};
-  DRAFT.Code="";DRAFT.Decision="";DRAFT.Reason="";DRAFT.Comment="";DRAFT.Approval_Date="";
-  DRAFT.Zonal=keep.Zonal;DRAFT.AP=keep.AP;
-  recompute(); saveLocal();
-  const row=S.master.find(r=>r.Row_ID===rid);
-  paint("06_DECISIONS"); badges();
-  toast('Logged <b>D-'+String(S.dec.length).padStart(4,"0")+'</b> · revision '+rev+
-    ' · '+esc(rid)+' is now <b>'+(row?row.Row_Status:"")+'</b>, stage '+(row?row.Stage:"")+
-    ' — visible on sheets 01–05 and 07.');
 }
 
 /* ==================================================================
@@ -1802,7 +1449,7 @@ function doImport(){
   const zs=uniq(out.map(r=>r.Zonal)).filter(z=>!ZONALS.some(x=>x.z===z));
   recompute(); saveLocal(); chip();
   document.getElementById("scrimImport").classList.remove("on");
-  go("07_DATAQUALITY");
+  go("00_MASTER");
   toast('Loaded <b>'+out.length+' rows</b> into tblMaster. Import gate reads <b>'+importGate()+'</b>.'+
     (zs.length?' Unknown zonal names: '+esc(zs.join(", "))+' — add them to tblAP.':''));
 }
@@ -1821,13 +1468,6 @@ function expDecisions(){
       S.dec.map((d,i)=>["D-"+String(i+1).padStart(4,"0"),d.Timestamp,d.Zonal,d.AP,d.Code,d.Row_ID,
         d.Revision,d.Row_ID+"|"+d.Revision,d.Decision,d.Reason,d.Comment,d.Reviewer,d.Owner,
         d.Due_Date,d.Status,d.Approval_Date])));
-}
-function expCorrections(){
-  const f=S.master.filter(r=>r.Flag_Count>0);
-  dl("WVI_AIMplus_Correction_List_FY27-30.csv",
-    csv(["Zonal","AP","AP_ID","Code","Indicator","Flag_Count","Flags","Owner","Status","Row_ID"],
-      f.map(r=>[r.Zonal,r.AP,r.AP_ID,r.Code,r.Indicator,r.Flag_Count,
-        FLAGS.filter(x=>r[x[0]]).map(x=>x[1]).join("; "),r.Dec_Owner,r.Dec_Status||"Not started",r.Row_ID])));
 }
 function expMaster(){
   const cols=["Row_ID","Zonal","AP","AP_ID","Outcome","Code","Indicator","Indicator_Short","Num_Base","Den_Base",
@@ -2116,10 +1756,22 @@ function showGate(next){
    ================================================================== */
 function chip(){
   const c=document.getElementById("dataChip"); if(!c)return;
-  c.textContent = S.local ? "local edits · not yet committed" : "repo data · "+CFG.Version;
-  c.style.background = S.local ? "rgba(12,121,147,.18)" : "rgba(255,85,21,.16)";
-  c.style.color      = S.local ? "#6FD3EC" : "#FF8B5C";
-  c.style.borderColor= S.local ? "rgba(12,121,147,.5)" : "rgba(255,85,21,.4)";
+  c.textContent = S.local ? "local edits · not committed" : CFG.Version;
+  c.className = S.local ? "chip local" : "chip";
+}
+
+/* the official WVI logo, if it has been dropped into the repository */
+function loadLogo(){
+  const img=document.getElementById("wvLogo"); if(!img)return;
+  const tries=["assets/logo.svg","assets/logo.png","logo.svg","logo.png"];
+  let i=0;
+  const attempt=()=>{
+    if(i>=tries.length){ img.remove(); return; }
+    img.onload =()=>{ img.hidden=false; };
+    img.onerror=()=>{ i++; attempt(); };
+    img.src=tries[i];
+  };
+  attempt();
 }
 function missingData(){
   document.getElementById("sheets").innerHTML =
@@ -2176,19 +1828,20 @@ function openWorkbook(){
   document.addEventListener("keydown",ev=>{
     if(ev.key==="Escape") document.querySelectorAll(".scrim.on").forEach(s=>s.classList.remove("on"));
   });
-  document.getElementById("btnImport").onclick=()=>document.getElementById("scrimImport").classList.add("on");
-  document.getElementById("btnExport").onclick=()=>document.getElementById("scrimExport").classList.add("on");
-  document.getElementById("btnPrint").onclick=()=>window.print();
-  document.getElementById("btnDoImport").onclick=doImport;
-  document.getElementById("btnMaster").onclick=()=>go("00_MASTER");
-  document.getElementById("expDec").onclick=expDecisions;
-  document.getElementById("expCorr").onclick=expCorrections;
-  document.getElementById("expMaster").onclick=expMaster;
-  document.getElementById("expJson").onclick=expJson;
-  document.getElementById("btnRefresh").onclick=()=>{
+  const on=(id,fn)=>{const el=document.getElementById(id); if(el) el.onclick=fn;};
+  on("btnImport",()=>document.getElementById("scrimImport").classList.add("on"));
+  on("btnExport",()=>document.getElementById("scrimExport").classList.add("on"));
+  on("btnPrint",()=>window.print());
+  on("btnDoImport",doImport);
+  on("btnMaster",()=>go("00_MASTER"));
+  on("expDec",expDecisions);
+  on("expMaster",expMaster);
+  on("expJson",expJson);
+  on("btnRefresh",()=>{
     recompute(); paintAll();
-    toast('Rebuilt from '+S.master.length+' rows and '+S.dec.length+' decisions. Import gate: <b>'+importGate()+'</b>.');
-  };
+    toast('Rebuilt from '+n0(S.master.length)+' rows. '+n0(countIf(r=>r.Stage===7))+' targets approved.');
+  });
+  loadLogo();
   go("HOME"); badges();
 }
 document.addEventListener("DOMContentLoaded",boot);
