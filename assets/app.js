@@ -288,7 +288,8 @@ function chartDiverge(items,opt){
 /* ==========================================================================
    KERANGKA HALAMAN + BAND FILTER
    ========================================================================== */
-const F={ zonal:[], ap:[], outcome:[], status:[], berlaku:"Yes", sort:null, sortDir:1, showAll:false };
+const F={ zonal:[], ap:[], outcome:[], status:[], berlaku:"Yes",
+  sort:null, sortDir:1, showAll:false, fbOpen:true };
 
 const SHEETS=[
  {id:"SUMMARY", tab:"SUMMARY", c:"#FF5515",
@@ -356,36 +357,65 @@ function filtered(){
     (!F.status.length  || F.status.indexOf(r._status)>=0) &&
     (F.berlaku==="(Semua)" || r._berlaku===F.berlaku));
 }
-function slicerBox(name,field,items,multi){
+function chips(field,items,multi){
   const sel=multi?F[field]:[F[field]];
-  return '<div class="slicer"><div class="sh"><span>'+esc(name)+'</span>'+
-    (multi?'<button data-clear="'+field+'" title="Bersihkan">⌧</button>':'')+'</div><div class="items">'+
-    items.map(it=>'<button data-slice="'+field+'" data-val="'+esc(it.v)+'" class="'+
-      (sel.indexOf(it.v)>=0?"sel":"")+(it.n===0?" nodata":"")+'">'+esc(it.v)+
-      (it.n!==undefined?' <span class="dim">'+it.n+'</span>':'')+'</button>').join('')+'</div></div>';
+  return items.map(it=>'<button class="chipf'+(sel.indexOf(it.v)>=0?" sel":"")+
+    (it.n===0?" nodata":"")+'" data-slice="'+field+'" data-val="'+esc(it.v)+'">'+esc(it.v)+
+    (it.n!==undefined?'<span class="n">'+it.n+'</span>':'')+'</button>').join('');
+}
+function fbRow(label,field,items,multi,hint){
+  const active=multi?F[field].length>0:false;
+  return '<div class="fb-row"><div class="fb-lab">'+esc(label)+
+    (active?'<button class="fb-x" data-clear="'+field+'" title="Bersihkan '+esc(label)+'">×</button>':'')+
+    '</div><div class="fb-chips">'+chips(field,items,multi)+
+    (hint?'<span class="fb-hint">'+hint+'</span>':'')+'</div></div>';
 }
 function filterBand(withStatus){
   const all=S.rows;
   const hidden=all.length-all.filter(r=>F.berlaku==="(Semua)"||r._berlaku===F.berlaku).length;
-  return '<div class="fband"><div class="frow">'+
-    slicerBox("Zonal","zonal",ZONALS.map(z=>({v:z,n:all.filter(r=>r.Zonal===z).length})),true)+
-    slicerBox("Area Program","ap",AP_LIST.map(a=>({v:a.ap,n:all.filter(r=>r["Area Program"]===a.ap).length})),true)+
-    slicerBox("Outcome","outcome",OUTCOMES.map(o=>({v:o,n:all.filter(r=>r.Outcome===o).length})),true)+
-    (withStatus?slicerBox("Status Indikator","status",
-      ST_IND.map(s=>({v:s.v,n:all.filter(r=>r._status===s.v).length})),true):'')+
-    slicerBox("Berlaku","berlaku",["Yes","No","(Semua)"].map(v=>({v:v,
-      n:v==="(Semua)"?all.length:all.filter(r=>r._berlaku===v).length})),false)+
-    '</div>'+(hidden>0?'<div class="fnote"><b>'+n0(hidden)+' baris</b> disembunyikan oleh filter Berlaku = '+
-      esc(F.berlaku)+'.</div>':'')+'</div>';
+  /* daftar AP mengikuti Zonal yang dipilih — 17 tombol jadi 3–8 */
+  const apPool=F.zonal.length?AP_LIST.filter(a=>F.zonal.indexOf(a.zonal)>=0):AP_LIST;
+  const nAktif=F.zonal.length+F.ap.length+F.outcome.length+F.status.length+(F.berlaku!=="Yes"?1:0);
+
+  if(!F.fbOpen){
+    return '<div class="fb closed"><div class="fb-head">'+
+      '<span class="fb-title">Filter</span>'+
+      '<span class="fb-sum">'+(nAktif?esc(activeText()):'tanpa filter')+'</span>'+
+      '<div class="fb-sp"></div>'+
+      '<button class="fb-btn" data-act="fbOpen">Ubah filter ▾</button>'+
+      '</div></div>';
+  }
+  return '<div class="fb"><div class="fb-head">'+
+      '<span class="fb-title">Filter</span>'+
+      '<span class="fb-sum">'+(nAktif?esc(activeText()):'tanpa filter')+'</span>'+
+      '<div class="fb-sp"></div>'+
+      (nAktif?'<button class="fb-btn" data-act="fbReset">Bersihkan semua</button>':'')+
+      '<button class="fb-btn" data-act="fbClose">Sembunyikan ▴</button>'+
+    '</div>'+
+    fbRow("Zonal","zonal",ZONALS.map(z=>({v:z,n:all.filter(r=>r.Zonal===z).length})),true)+
+    fbRow("Area Program","ap",apPool.map(a=>({v:a.ap,n:all.filter(r=>r["Area Program"]===a.ap).length})),true,
+      F.zonal.length?'daftar mengikuti Zonal yang dipilih':'pilih Zonal untuk memendekkan daftar ini')+
+    fbRow("Outcome","outcome",OUTCOMES.map(o=>({v:o,n:all.filter(r=>r.Outcome===o).length})),true)+
+    (withStatus?fbRow("Status","status",ST_IND.map(s=>({v:s.v,
+      n:all.filter(r=>r._status===s.v).length})),true):'')+
+    fbRow("Berlaku","berlaku",[{v:"Yes",n:all.filter(r=>r._berlaku==="Yes").length},
+      {v:"No",n:all.filter(r=>r._berlaku==="No").length},{v:"(Semua)",n:all.length}],false)+
+    (hidden>0?'<div class="fb-note"><b>'+n0(hidden)+' baris</b> disembunyikan oleh Berlaku = '+
+      esc(F.berlaku)+'</div>':'')+
+  '</div>';
 }
-function activeLine(){
+function activeText(){
   const b=[];
   if(F.zonal.length) b.push(F.zonal.join(", "));
-  if(F.ap.length) b.push(F.ap.length+" AP");
+  if(F.ap.length) b.push(F.ap.length===1?F.ap[0]:F.ap.length+" AP");
   if(F.outcome.length) b.push(F.outcome.join(", "));
   if(F.status.length) b.push(F.status.join(", "));
-  if(F.berlaku!=="(Semua)") b.push("Berlaku "+F.berlaku);
-  return b.length?' <span class="hint">'+esc(b.join(" · "))+'</span>':' <span class="hint">tanpa filter</span>';
+  if(F.berlaku!=="Yes") b.push("Berlaku "+F.berlaku);
+  return b.join(" · ");
+}
+function activeLine(){
+  const s=activeText();
+  return s?' <span class="hint">'+esc(s)+'</span>':'';
 }
 function sortRows(rows,cols){
   if(!F.sort) return rows;
@@ -404,21 +434,7 @@ const th = (label,key,cls) => '<th class="'+(cls||"")+(F.sort===key?" sorted":""
    HALAMAN 1 — SUMMARY
    ========================================================================== */
 function renderSummary(){
-  const rows=filtered(), n=rows.length;
-  const aps=uniq(rows.map(r=>r["Area Program"]));
-  const inds=uniq(rows.map(r=>r.Indicator));
-  const ada=rows.filter(r=>N(r.Pct_Base)>0).length;
-  const belum=n-ada;
-  const setT=rows.filter(r=>r.AP_vs_Threshold==="Set target").length;
-  const mon=rows.filter(r=>r.AP_vs_Threshold==="Monitor Indicator").length;
-  const kosong=n-setT-mon;
-
-  /* G1 · kelengkapan baseline per AP */
-  const g1=aps.map(ap=>{
-    const rs=rows.filter(r=>r["Area Program"]===ap);
-    const a=rs.filter(r=>N(r.Pct_Base)>0).length;
-    return {label:ap, vals:[a, rs.length-a], pct:rs.length?a/rs.length:0};
-  }).sort((a,b)=>b.pct-a.pct);
+  const rows=filtered();
 
   /* G2 · komposisi indikator per outcome × zonal */
   const g2=OUTCOMES.map(o=>({label:o,
@@ -442,30 +458,18 @@ function renderSummary(){
 
   return filterBand(false)+
 
-  '<div class="slabel">Ringkasan nasional'+activeLine()+'</div>'+
-  '<div class="cards">'+
-    card("Ada<br>baseline",n0(ada),(n?(ada/n*100).toFixed(1)+"% dari "+n0(n)+" baris":"—"),"ready")+
-    card("Set<br>target",n0(setT),"","review")+
-    card("Monitor<br>Indicator",n0(mon),"","monitor")+
-    card("Belum<br>diisi",n0(kosong),"","belum")+
-  '</div>'+
-
-  '<div class="grid2" style="margin-top:22px">'+
-    '<div><div class="slabel" style="margin-top:0">G1 · Kelengkapan baseline per Area Program</div>'+
-      '<div class="chartbox">'+chartStack(g1,[["Ada baseline",CLR.baik],["Belum ada baseline",CLR.belum]],
-        {pct100:true,labW:138})+legend([["Ada baseline",CLR.baik],["Belum ada baseline",CLR.belum]])+'</div></div>'+
-    '<div><div class="slabel" style="margin-top:0">G2 · Komposisi indikator per Outcome</div>'+
+  '<div class="grid2" style="margin-top:18px">'+
+    '<div><div class="slabel" style="margin-top:0">Komposisi indikator per Outcome</div>'+
       '<div class="chartbox">'+chartStack(g2,ZONALS.map((z,i)=>[z,CLR.zonal[i%4]]),{labW:70,bh:22,gap:12})+
         legend(ZONALS.map((z,i)=>[z,CLR.zonal[i%4]]))+'</div></div>'+
-  '</div>'+
-
-  '<div style="margin-top:20px">'+
-    '<div><div class="slabel" style="margin-top:0">G3 · Baseline vs Threshold per indikator</div>'+
+    '<div><div class="slabel" style="margin-top:0">Baseline vs Threshold per indikator</div>'+
       '<div class="chartbox">'+chartPair(g4,["Baseline",CLR.baseline],["Threshold",CLR.threshold],{labW:250})+
         legend([["Rata-rata Baseline",CLR.baseline],["Threshold",CLR.threshold]])+
         '<p class="chartnote">Rata-rata antar Area Program, hanya baris dengan nilai &gt; 0. '+
         'Bersifat indikatif, bukan angka nasional resmi.</p></div></div>'+
   '</div>'+
+
+
 
   '<div class="slabel">Tabel lengkap semua indikator '+
     '<span class="hint">'+n0(view.length)+' baris'+(cap<view.length?' · menampilkan '+cap:'')+
@@ -560,17 +564,17 @@ function renderAnalisis(){
       (CFG.target_delta*100).toFixed(0)+'pp</b></span></div>'+
 
   '<div class="grid2" style="margin-top:22px">'+
-    '<div><div class="slabel" style="margin-top:0">G4 · Status indikator per Area Program</div>'+
+    '<div><div class="slabel" style="margin-top:0">Status indikator per Area Program</div>'+
       '<div class="chartbox">'+chartStack(g5,SER_IND,{pct100:true,labW:138})+legend(SER_IND)+'</div></div>'+
-    '<div><div class="slabel" style="margin-top:0">G5 · Endline vs Threshold per Area Program</div>'+
+    '<div><div class="slabel" style="margin-top:0">Endline vs Threshold per Area Program</div>'+
       '<div class="chartbox">'+chartStack(g6,SER_THR,{pct100:true,labW:138})+legend(SER_THR)+
-      '<p class="chartnote">Urutan baris sama dengan G4, jadi kedua grafik bisa dibaca berpasangan.</p></div></div>'+
+      '<p class="chartnote">Urutan baris sama dengan grafik di sebelah kiri, jadi kedua grafik bisa dibaca berpasangan.</p></div></div>'+
   '</div>'+
 
   '<div class="grid2" style="margin-top:20px">'+
-    '<div><div class="slabel" style="margin-top:0">G6 · Delta vs Target per indikator</div>'+
+    '<div><div class="slabel" style="margin-top:0">Delta vs Target per indikator</div>'+
       '<div class="chartbox">'+chartStack(g7,SER_TGT,{pct100:true,labW:250,bh:12,gap:6})+legend(SER_TGT)+'</div></div>'+
-    '<div><div class="slabel" style="margin-top:0">G7 · Delta rata-rata vs Target Delta</div>'+
+    '<div><div class="slabel" style="margin-top:0">Delta rata-rata vs Target Delta</div>'+
       '<div class="chartbox">'+chartDiverge(g8,{labW:250})+
         legend([["Delta rata-rata",CLR.endline]],'<div><i style="background:'+CLR.ref+';width:3px"></i>Target Delta</div>')+
         '<p class="chartnote">Delta rata-rata hanya dari baris yang punya baseline dan endline. '+
@@ -742,6 +746,7 @@ function wire(id,el){
     const f=b.dataset.slice, v=b.dataset.val;
     if(f==="berlaku") F.berlaku=v;
     else { const i=F[f].indexOf(v); i>=0?F[f].splice(i,1):F[f].push(v); }
+    if(f==="zonal"&&F.zonal.length) F.ap=F.ap.filter(ap=>F.zonal.indexOf(S.apz[ap])>=0);
     F.showAll=false; paint(id);
   });
   el.querySelectorAll("[data-clear]").forEach(b=>b.onclick=()=>{F[b.dataset.clear]=[];paint(id);});
@@ -764,6 +769,9 @@ function wire(id,el){
 function act(b,id){
   const a=b.dataset.act;
   if(a==="showAll"){ F.showAll=true; paint(id); return; }
+  if(a==="fbOpen"){ F.fbOpen=true; paint(id); return; }
+  if(a==="fbClose"){ F.fbOpen=false; paint(id); return; }
+  if(a==="fbReset"){ F.zonal=[];F.ap=[];F.outcome=[];F.status=[];F.berlaku="Yes";F.showAll=false; paint(id); return; }
   if(a==="delAsumsi"){
     const g=S.asumsi.splice(+b.dataset.i,1)[0];
     recompute(); saveLocal(); paint(id);
