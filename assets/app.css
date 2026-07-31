@@ -232,23 +232,44 @@ tr.apmark td:first-child{box-shadow:inset 3px 0 0 var(--orange)}
 .fcell select:focus{border-color:var(--orange)}
 .fnote{font-size:10px;color:#8A8894;margin-top:9px;padding-top:8px;border-top:1px dashed var(--rule)}
 
-/* slicer (§6.3 tabel 8) */
-.slicer{border:1px solid #BEBBC4;background:var(--paper);min-width:150px}
-.slicer .sh{
-  font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-  padding:4px 7px;background:#EFEDE9;border-bottom:1px solid #BEBBC4;color:var(--grey);
-  display:flex;justify-content:space-between;align-items:center;gap:6px;
+/* band filter — satu baris per dimensi, ringkas dan bisa dilipat */
+.fb{border:1px solid var(--rule);background:var(--paper);margin-top:16px}
+.fb-head{
+  display:flex;align-items:center;gap:12px;padding:7px 12px;background:var(--band);
+  border-bottom:1px solid var(--rule);flex-wrap:wrap;
 }
-.slicer .sh button{border:none;background:none;cursor:pointer;color:#8A8894;font-size:11px;padding:0 2px}
-.slicer .sh button:hover{color:var(--orange)}
-.slicer .items{display:flex;flex-wrap:wrap;gap:3px;padding:5px}
-.slicer .items button{
-  border:1px solid #D3D0D8;background:#FBFAF9;padding:3px 8px;font-size:10.5px;
-  border-radius:2px;cursor:pointer;color:var(--grey);
+.fb.closed .fb-head{border-bottom:none}
+.fb-title{font-size:9px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--grey)}
+.fb-sum{font-size:11px;color:var(--midnight);font-weight:600;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+.fb-sp{flex:1}
+.fb-btn{
+  border:1px solid var(--rule);background:var(--paper);color:var(--grey);
+  font-size:10.5px;padding:4px 10px;border-radius:2px;cursor:pointer;white-space:nowrap;
 }
-.slicer .items button:hover{border-color:var(--orange)}
-.slicer .items button.sel{background:var(--midnight);border-color:var(--midnight);color:#fff;font-weight:600}
-.slicer .items button.nodata{color:#BEBBC4;background:#F6F5F3;text-decoration:line-through}
+.fb-btn:hover{border-color:var(--orange);color:var(--orange)}
+.fb-row{display:grid;grid-template-columns:104px 1fr;gap:10px;align-items:start;
+  padding:6px 12px;border-bottom:1px solid #F4F2EF}
+.fb-row:last-of-type{border-bottom:none}
+.fb-lab{
+  font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--grey);
+  padding-top:5px;display:flex;align-items:center;gap:5px;
+}
+.fb-x{border:none;background:none;cursor:pointer;color:#B9B6BE;font-size:14px;line-height:1;padding:0}
+.fb-x:hover{color:var(--red)}
+.fb-chips{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.chipf{
+  border:1px solid #DCD9E0;background:var(--paper);color:var(--grey);
+  font-size:10.5px;padding:3px 8px;border-radius:11px;cursor:pointer;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:5px;
+}
+.chipf .n{font-size:9px;color:#A9A6B0;font-variant-numeric:tabular-nums}
+.chipf:hover{border-color:var(--orange);color:var(--orange)}
+.chipf.sel{background:var(--midnight);border-color:var(--midnight);color:#fff;font-weight:600}
+.chipf.sel .n{color:#9C99A6}
+.chipf.nodata{color:#C2BFC8;background:#FAFAF9}
+.fb-hint{font-size:9.5px;color:#A9A6B0;font-style:italic;margin-left:4px}
+.fb-note{padding:7px 12px;border-top:1px dashed var(--rule);font-size:10.5px;color:var(--grey);background:#FCFBFA}
 
 /* ============================================================
    CHARTS — inline SVG only, no libraries
@@ -523,6 +544,9 @@ button.tiny.warn:hover{background:var(--f-critical)}
    ============================================================ */
 @media (max-width:860px){
   :root{--gutter:12px}
+  .fb-row{grid-template-columns:1fr;gap:3px}
+  .fb-lab{padding-top:0}
+  .fb-sum{max-width:100%}
   .addbar,.ocscope{flex-direction:column;align-items:flex-start}
   .ocscope .chg{margin-left:0}
   .brand .sub{display:none}
@@ -543,7 +567,8 @@ button.tiny.warn:hover{background:var(--f-critical)}
 @media print{
   @page{size:A4 landscape;margin:1.2cm 1.5cm}
   body{background:#fff;font-size:8.6pt}
-  .tabbar,.scrim,.toast,.slicer,.noprint{display:none!important}
+  .tabbar,.scrim,.toast,.noprint{display:none!important}
+  .fb-head,.fb-hint{display:none!important}
   .wvhead{position:static;box-shadow:none;border-bottom:1pt solid #666;margin-bottom:6pt}
   .wvhead .tools,.wvhead .chip,.wvhead-sp{display:none!important}
   .wvhead-in{padding-left:0;padding-right:0;min-height:0}
@@ -600,4 +625,3 @@ button.yn.y{background:#E8F1EC;border-color:#9EC6AE;color:#155930}
 button.yn.n{background:var(--f-reference);border-color:var(--rule);color:#A9A6B0}
 button.yn:hover{border-color:var(--orange);color:var(--orange)}
 select.cell.wide{max-width:400px}
-.slicer .items{max-height:132px;overflow-y:auto}
