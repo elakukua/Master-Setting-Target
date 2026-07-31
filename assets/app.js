@@ -127,6 +127,7 @@ function checks(){
   const comboDupe=uniq(S.rows.filter(r=>r._dupe).map(r=>r["Area Program"]+"|"+r.Indicator)).length;
   const dupeRows=S.rows.filter(r=>r._dupe).length;
   const total=ST_IND.reduce((a,s)=>a+S.rows.filter(r=>r._status===s.v).length,0);
+  const oor=S.rows.filter(r=>Math.abs(N(r.Pct_Base))>1||Math.abs(N(r.Pct_LOP))>1).length;
   const unknownAsumsi=S.asumsi.filter(a=>IND_LIST.indexOf(a.ind)<0).length;
   const unknownAP=S.pemetaan.aps.filter(a=>!AP_LIST.some(x=>x.ap===a)).length;
   return {
@@ -134,9 +135,10 @@ function checks(){
     rowid: idDupe===0 ? "ROW ID OK" : "ROW ID GANDA ("+idDupe+")",
     sinkron: total===n ? "SINKRON" : "TIDAK SINKRON ("+total+" dari "+n+")",
     dupe: comboDupe===0 ? "TIDAK ADA DUPLIKAT" : comboDupe+" KOMBINASI AP × INDIKATOR GANDA",
-    dupeRows:dupeRows, comboDupe:comboDupe,
+    dupeRows:dupeRows, comboDupe:comboDupe, oor:oor,
+    range: oor===0 ? "PROPORSI OK" : oor+" PROPORSI DI LUAR 0–100%",
     unknownAsumsi:unknownAsumsi, unknownAP:unknownAP,
-    ok: idDupe===0 && total===n && comboDupe===0 && unknownAsumsi===0 && unknownAP===0
+    ok: idDupe===0 && total===n && comboDupe===0 && oor===0 && unknownAsumsi===0 && unknownAP===0
   };
 }
 
@@ -328,7 +330,7 @@ function crumbLine(){
   return 'Data per <b>'+esc(CFG.data_date)+'</b> &nbsp;·&nbsp; <b>'+n0(c.n)+'</b> baris &nbsp;·&nbsp; <b>'+
     AP_LIST.length+'</b> AP &nbsp;·&nbsp; <b>'+ZONALS.length+'</b> Zonal &nbsp;·&nbsp; '+
     chipOf(c.rowid,c.rowid==="ROW ID OK")+chipOf(c.sinkron,c.sinkron==="SINKRON")+
-    chipOf(c.dupe,c.comboDupe===0);
+    chipOf(c.dupe,c.comboDupe===0)+chipOf(c.range,c.oor===0);
 }
 function go(id){
   if(!SHEETS.some(s=>s.id===id))return;
@@ -498,6 +500,182 @@ function renderSummary(){
     n0(view.length)+' baris</button></div>':'')+
   '<p class="tcap">Sel merah = nilai <b>0</b>, yang menurut konvensi PEARL berarti <b>belum ada data</b>. '+
    'Baris abu-abu miring: <b>Berlaku = No</b>.</p>';
+}
+/* ==========================================================================
+   IMPOR DARI EXCEL
+   Tempel blok sheet Indicators, halaman memeriksanya, lalu menulis ulang
+   data/indicators.js untuk di-commit. Tidak perlu mengedit file dengan tangan.
+
+   Angka ditafsirkan per kolom, bukan seragam: kolom hitungan (Numerator,
+   Denominator) memperlakukan pemisah 3 digit sebagai ribuan, kolom proporsi
+   memperlakukan pemisah terakhir sebagai desimal. Ini yang membuat blok dari
+   Excel berbahasa Indonesia ("0,2349") maupun Inggris ("0.2349") sama-sama
+   terbaca benar.
+   ========================================================================== */
+const IMP_COLS=["Zonal","Area Program","Outcome","Code","Indicator","Num_Base","Den_Base",
+  "Pct_Base","Num_LOP","Den_LOP","Pct_LOP","Delta","AP_Decision","Threshold",
+  "AP_vs_Threshold","Delta_LOP_Base","Row_ID"];
+const IMP_KIND={Num_Base:"count",Den_Base:"count",Num_LOP:"count",Den_LOP:"count",
+  Pct_Base:"prop",Pct_LOP:"prop",Delta:"prop",AP_Decision:"prop",Threshold:"prop",
+  Delta_LOP_Base:"prop"};
+
+/* Pemisah desimal dideteksi sekali untuk seluruh blok, dari kolom proporsi —
+   di sana pemisah yang diikuti 2 digit atau lebih pasti desimal, bukan ribuan.
+   Setelah diketahui, setiap angka dibaca dengan aturan yang sama, jadi
+   "115.099" tidak lagi ambigu: ia bergantung pada locale blok itu, bukan tebakan
+   per sel. Kalau blok tidak memberi petunjuk, dipakai titik. */
+let DECSEP=".";
+function detectDecSep(lines,start){
+  const PROP=[7,10,11,12,13,15];
+  let dot=0, com=0;
+  for(let i=start;i<lines.length;i++){
+    const c=lines[i].split("\t");
+    PROP.forEach(j=>{
+      const s=String(c[j]==null?"":c[j]).replace(/[\s\u00a0%]/g,"");
+      const m=s.match(/([.,])(\d{2,})$/);
+      if(m){ m[1]==="." ? dot++ : com++; }
+    });
+  }
+  DECSEP = com>dot ? "," : ".";
+  return {sep:DECSEP, dot:dot, com:com};
+}
+function parseNum(raw){
+  let s=String(raw==null?"":raw).replace(/[\s\u00a0]/g,"");
+  if(s===""||s==="-"||s==="—") return null;
+  const pct=/%$/.test(s); s=s.replace(/%/g,"");
+  const neg=/^\(.*\)$/.test(s)||/^-/.test(s);
+  s=s.replace(/^[+-]/,"").replace(/^\(|\)$/g,"");
+  if(!/^[\d.,]+$/.test(s)) return null;
+  const grp = DECSEP==="," ? "." : ",";
+  const dec = s.lastIndexOf(DECSEP);
+  let out;
+  if(dec<0) out=s.split(grp).join("");
+  else out = s.slice(0,dec).split(grp).join("").split(DECSEP).join("")+"."+
+             s.slice(dec+1).split(grp).join("").split(DECSEP).join("");
+  let n=parseFloat(out);
+  if(!isFinite(n)) return null;
+  if(neg) n=-n;
+  if(pct) n=n/100;
+  return n;
+}
+function clean(v){return String(v==null?"":v).replace(/[\x00-\x1F\x7F]/g,"").trim();}
+
+/* Excel membungkus sel yang berisi Tab, baris baru, atau tanda kutip dengan
+   tanda kutip ganda. Kolom Code di data ini memang berisi baris baru
+   (mis. "C5G.027623\n"), jadi memecah teks per baris saja akan menggeser kolom.
+   Parser di bawah membaca seluruh blok sebagai satu aliran. */
+function parseTSV(text){
+  const rows=[]; let row=[], cell="", q=false, i=0;
+  const s=text.replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+  while(i<s.length){
+    const ch=s[i];
+    if(q){
+      if(ch==='"'){ if(s[i+1]==='"'){cell+='"';i+=2;continue;} q=false; i++; continue; }
+      cell+=ch; i++; continue;
+    }
+    if(ch==='"'&&cell===""){ q=true; i++; continue; }
+    if(ch==="\t"){ row.push(cell); cell=""; i++; continue; }
+    if(ch==="\n"){ row.push(cell); rows.push(row); row=[]; cell=""; i++; continue; }
+    cell+=ch; i++;
+  }
+  if(cell!==""||row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(r=>r.join("").trim()!=="");
+}
+
+let IMP=null;   /* hasil parse yang menunggu konfirmasi */
+
+function impParse(){
+  const raw=document.getElementById("impBox").value;
+  const cells=parseTSV(raw);
+  const rep=document.getElementById("impReport");
+  if(!cells.length){ rep.innerHTML='<p class="vmsg">▲ Belum ada yang ditempel.</p>'; IMP=null; return; }
+
+  let start=0;
+  if(/^zonal$/i.test(clean(cells[0][0]))) start=1;   /* baris header ikut tertempel */
+  const lines=cells.map(c=>c.join("\t"));
+  const loc=detectDecSep(lines,start);
+
+  const rows=[], bad=[];
+  for(let i=start;i<cells.length;i++){
+    const c=cells[i];
+    if(c.length<5){ bad.push({line:i+1, why:"hanya "+c.length+" kolom"}); continue; }
+    const r={};
+    IMP_COLS.forEach((k,j)=>{
+      const v=c[j];
+      /* Nilai dimuat apa adanya. Proporsi di luar 0–1 TIDAK dikoreksi otomatis —
+         ia dilaporkan, karena mengubahnya diam-diam berarti mengarang data. */
+      if(IMP_KIND[k]) r[k]=parseNum(v);
+      else r[k]=clean(v)||null;
+    });
+    if(!r.Row_ID) r.Row_ID="IND-"+String(rows.length+1).padStart(3,"0");
+    if(!r["Area Program"]||!r.Indicator){ bad.push({line:i+1, why:"Area Program atau Indikator kosong"}); continue; }
+    rows.push(r);
+  }
+  if(!rows.length){ rep.innerHTML='<p class="vmsg">▲ Tidak ada baris yang bisa dibaca. '+
+    'Pastikan blok disalin dari sheet Indicators, 17 kolom, dipisah Tab.</p>'; IMP=null; return; }
+
+  /* ---- pemeriksaan ---- */
+  const seen={}, idDupe=[];
+  rows.forEach(r=>{ if(seen[r.Row_ID]) idDupe.push(r.Row_ID); seen[r.Row_ID]=1; });
+  const unkInd=uniq(rows.map(r=>r.Indicator).filter(x=>IND_LIST.indexOf(x)<0));
+  const unkAP=uniq(rows.map(r=>r["Area Program"]).filter(x=>!AP_LIST.some(a=>a.ap===x)));
+  const unkOC=uniq(rows.map(r=>r.Outcome).filter(x=>x&&OUTCOMES.indexOf(x)<0));
+  const combo={}; rows.forEach(r=>{const k=r["Area Program"]+"|"+r.Indicator; combo[k]=(combo[k]||0)+1;});
+  const comboDupe=Object.keys(combo).filter(k=>combo[k]>1).length;
+  const oldIds=new Set(S.rows.map(r=>r.Row_ID));
+  const added=rows.filter(r=>!oldIds.has(r.Row_ID)).length;
+  const gone=S.rows.filter(r=>!seen[r.Row_ID]).length;
+  const withBase=rows.filter(r=>N(r.Pct_Base)>0).length;
+  const withLop=rows.filter(r=>N(r.Pct_LOP)>0).length;
+  const oor=rows.filter(r=>Math.abs(N(r.Pct_Base))>1||Math.abs(N(r.Pct_LOP))>1);
+  const shifted=rows.filter(r=>r.Row_ID&&!/^IND-\d+$/i.test(r.Row_ID)).length;
+
+  const blok=(ok,txt)=>'<span class="ichip '+(ok?"ok":"no")+'">'+(ok?"● ":"▲ ")+txt+'</span>';
+  rep.innerHTML=
+    '<div class="imprep">'+
+      '<div class="improw"><b>'+n0(rows.length)+'</b> baris terbaca'+
+        (start?' <span class="dim">(baris header diabaikan)</span>':'')+'</div>'+
+      '<div class="improw">Dibanding data sekarang ('+n0(S.rows.length)+' baris): '+
+        '<b>'+added+'</b> baris baru, <b>'+gone+'</b> baris hilang</div>'+
+      '<div class="improw">Ada baseline <b>'+withBase+'</b> · ada endline <b>'+withLop+'</b></div>'+
+      '<div class="improw">Pemisah desimal terdeteksi: <b>'+(loc.sep===","?"koma":"titik")+'</b>'+
+        ' <span class="dim">('+loc.com+' nilai berkoma, '+loc.dot+' bertitik)</span></div>'+
+      '<div class="improw">'+
+        blok(idDupe.length===0, idDupe.length?"Row ID ganda: "+idDupe.slice(0,4).join(", "):"Row ID unik")+
+        blok(unkInd.length===0, unkInd.length?unkInd.length+" indikator tidak dikenal":"Nama indikator dikenal")+
+        blok(unkAP.length===0, unkAP.length?"AP tidak dikenal: "+unkAP.join(", "):"Nama AP dikenal")+
+        (unkOC.length?blok(false,"Outcome tidak dikenal: "+unkOC.join(", ")):"")+
+        (comboDupe?blok(false,comboDupe+" kombinasi AP × indikator ganda"):blok(true,"Tidak ada duplikat"))+
+        (bad.length?blok(false,bad.length+" baris dilewati"):"")+
+        (oor.length?blok(false,oor.length+" proporsi di luar 0–100%"):blok(true,"Semua proporsi 0–100%"))+
+        (shifted?blok(false,shifted+" Row ID tidak berpola IND-nnn"):"")+
+      '</div>'+
+      (oor.length?'<div class="improw" style="color:var(--red)">Di luar 0–100%: '+
+        oor.slice(0,4).map(r=>esc(r.Row_ID)+" ("+(N(r.Pct_Base)>1?"baseline "+(N(r.Pct_Base)*100).toFixed(0)+"%":
+        "endline "+(N(r.Pct_LOP)*100).toFixed(0)+"%")+")").join(" · ")+(oor.length>4?" …":"")+
+        '. Dimuat apa adanya, tidak dikoreksi otomatis.</div>':'')+
+      (unkInd.length?'<div class="improw dim">Indikator tidak dikenal tidak akan dapat Arah, Target Delta, '+
+        'maupun Berlaku dari konfigurasi: '+esc(unkInd.slice(0,3).map(shortOf).join(" · "))+
+        (unkInd.length>3?" …":"")+'. Tambahkan dulu di pemetaan.js.</div>':'')+
+      (bad.length?'<div class="improw dim">Dilewati: '+bad.slice(0,3).map(b=>"baris "+b.line+" ("+b.why+")").join(" · ")+'</div>':'')+
+    '</div>';
+  IMP={rows:rows, hard:(idDupe.length>0||unkAP.length>0||bad.length>0)};
+  const btn=document.getElementById("impGo");
+  btn.disabled=false;
+  btn.textContent=IMP.hard?"Muat walaupun ada peringatan":"Muat "+n0(rows.length)+" baris";
+}
+function impApply(){
+  if(!IMP){ return; }
+  S.rows=IMP.rows.map(r=>Object.assign({},r));
+  recompute(); saveLocal();
+  document.getElementById("scrimImport").classList.remove("on");
+  document.getElementById("impBox").value=""; document.getElementById("impReport").innerHTML="";
+  document.getElementById("impGo").disabled=true;
+  const c=checks();
+  repaint(); 
+  toast('Data dimuat: <b>'+n0(S.rows.length)+' baris</b>. '+esc(c.sinkron)+'. '+
+    'Jangan lupa <b>Simpan file data</b> lalu commit <span style="color:#8FE0AE">data/indicators.js</span>.');
+  IMP=null;
 }
 /* ==========================================================================
    HALAMAN 2 — ANALISIS AP
@@ -973,6 +1151,15 @@ function open2(){
     toast('Tiga file data diunduh. Commit ke folder <b>data/</b> dengan nama yang sama.');
   });
   on("btnCsv",dlCsv);
+  on("btnImport",()=>document.getElementById("scrimImport").classList.add("on"));
+  on("impCheck",impParse);
+  on("impGo",impApply);
+  document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>
+    b.closest(".scrim").classList.remove("on"));
+  document.querySelectorAll(".scrim").forEach(s=>s.onclick=ev=>{
+    if(ev.target===s) s.classList.remove("on");});
+  document.addEventListener("keydown",ev=>{
+    if(ev.key==="Escape") document.querySelectorAll(".scrim.on").forEach(s=>s.classList.remove("on"));});
   on("btnReset",()=>{clearLocal();location.reload();});
   go("SUMMARY");
 }
