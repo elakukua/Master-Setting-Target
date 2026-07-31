@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AIM+ AP Target Setting — Decision Workbook · FY27–30 · PEARL WVI</title>
+<title>AIM+ AP Target Setting · Wahana Visi Indonesia</title>
 <meta name="description" content="Area Programme target setting decision workbook for the AIM+ cycle FY27–FY30. PEARL, Wahana Visi Indonesia.">
 <meta name="color-scheme" content="light">
 
@@ -24,27 +24,36 @@
 </head>
 <body>
 
-<!-- ========================= WORKBOOK CHROME ========================= -->
-<div class="chrome noprint">
-  <div class="chrome-in">
-    <div class="filename">
-      <b>WVI_AIMplus_TargetSetting_Decision_Workbook_FY27-30</b><span class="ext">&nbsp;· static site</span>
+<!-- ========================= HEADER =========================
+     The logo is loaded from assets/logo.svg or assets/logo.png.
+     Drop the official WVI file in with either name and it appears;
+     without it the type lockup stands on its own.
+     ========================================================== -->
+<header class="wvhead">
+  <div class="wvhead-in">
+    <div class="brand">
+      <img id="wvLogo" class="logo" alt="World Vision" hidden>
+      <div class="lock">
+        <span class="org">Wahana Visi Indonesia</span>
+        <span class="sub">PEARL &nbsp;·&nbsp; AIM+ Area Programme Target Setting &nbsp;·&nbsp; FY27–FY30</span>
+      </div>
     </div>
+    <div class="wvhead-sp"></div>
     <span class="chip" id="dataChip">loading…</span>
-    <div class="chrome-sp"></div>
-    <span class="lockstate">🔒 Reports read-only · sheets 00 and 06 accept input</span>
-    <button class="cbtn" id="btnMaster" title="Edit the data, the AP register and the outcome map">✎ Master setup</button>
-    <button class="cbtn" id="btnRefresh" title="Rebuilds every derived column, chart and card">↻ Rebuild</button>
-    <button class="cbtn" id="btnImport">⤓ Import submissions</button>
-    <button class="cbtn" id="btnExport">⤒ Export</button>
-    <button class="cbtn" id="btnPrint">⎙ Print</button>
+    <nav class="tools">
+      <button class="cbtn" id="btnMaster" title="Edit the data, the AP register and the outcome map">✎ Master setup</button>
+      <button class="cbtn" id="btnRefresh" title="Rebuilds every derived column, chart and card">↻ Rebuild</button>
+      <button class="cbtn" id="btnImport">⤓ Import</button>
+      <button class="cbtn" id="btnExport">⤒ Export</button>
+      <button class="cbtn" id="btnPrint">⎙ Print</button>
+    </nav>
   </div>
-</div>
+</header>
 
 <!-- ========================= SHEETS ========================= -->
 <div class="sheetwrap" id="sheets">
-  <div id="boot"><h2>Opening the workbook…</h2>
-  <p>Loading the AP register, the indicator catalogue, the submission data and the decision log.</p></div>
+  <div id="boot"><h2>Opening…</h2>
+  <p>Loading the AP register, the indicator catalogue and the submission data.</p></div>
 </div>
 
 <!-- ========================= SHEET TABS ========================= -->
@@ -79,14 +88,12 @@
       <p>CSV opens directly in Excel. To change what this site <i>publishes</i>, use
          <b>Master setup → Save &amp; publish</b> instead: those downloads are the data files themselves.</p>
       <div class="fgrid">
-        <div class="fg"><button class="ghost" id="expDec" style="width:100%">Decision log (CSV)</button>
-          <div class="hlp">All revisions, in append order</div></div>
-        <div class="fg"><button class="ghost" id="expCorr" style="width:100%">Correction list (CSV)</button>
-          <div class="hlp">Every flagged row, for the APs to fix</div></div>
-        <div class="fg"><button class="ghost" id="expMaster" style="width:100%">tblMaster (CSV)</button>
-          <div class="hlp">All 40 columns, derived fields included</div></div>
-        <div class="fg"><button class="ghost" id="expJson" style="width:100%">Workbook state (JSON)</button>
-          <div class="hlp">Data plus decisions, one file</div></div>
+        <div class="fg"><button class="ghost" id="expMaster" style="width:100%">Submission data (CSV)</button>
+          <div class="hlp">Every row, with the derived fields</div></div>
+        <div class="fg"><button class="ghost" id="expDec" style="width:100%">Decision record (CSV)</button>
+          <div class="hlp">All revisions, in the order logged</div></div>
+        <div class="fg"><button class="ghost" id="expJson" style="width:100%">Everything (JSON)</button>
+          <div class="hlp">Data and decisions in one file</div></div>
       </div>
     </div>
     <div class="foot"><button class="ghost" data-close>Close</button>
