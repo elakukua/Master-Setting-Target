@@ -31,6 +31,7 @@
     <div class="wvhead-sp"></div>
     <span class="chip" id="dataChip">memuat…</span>
     <nav class="tools">
+      <button class="cbtn" id="btnImport" title="Tempel blok dari sheet Indicators di Excel">⤓ Impor data</button>
       <button class="cbtn" id="btnSave" title="Unduh file data untuk di-commit ke repository">⤒ Simpan file data</button>
       <button class="cbtn" id="btnCsv" title="Unduh tabel sesuai filter, siap dibuka di Excel">⤓ CSV</button>
       <button class="cbtn" id="btnPrint">⎙ Cetak</button>
@@ -44,6 +45,29 @@
 </div>
 
 <div class="tabbar noprint"><div class="tabbar-in" id="tabbar"></div></div>
+<div class="scrim" id="scrimImport">
+  <div class="modal">
+    <h3>Impor data dari Excel <button data-close>✕</button></h3>
+    <div class="body">
+      <p>Di sheet <b>Indicators</b>, pilih seluruh blok data (boleh ikut baris header), copy,
+         lalu tempel di bawah. Urutan 17 kolom tidak boleh diubah:</p>
+      <div class="colspec">Zonal · Area Program · Outcome · Code · Indicator deskripsi · Numerator Baseline · Denominator baseline · % Baseline · Numerator LOP · Denominator LOP · % LOP · Delta · AP Decision · Threshold · AP AIM+ 2026 &gt;= Threshold? · Delta (LOP-Baseline) · Row ID</div>
+      <p class="dim">Angka boleh berkoma maupun bertitik — <b>0,2349</b> dan <b>0.2349</b> sama-sama terbaca,
+         begitu juga <b>23,5%</b>. Sel kosong tetap kosong. Nilai <b>0</b> pada % Baseline atau % LOP
+         tetap berarti belum ada data, sesuai konvensi PEARL.</p>
+      <textarea id="impBox" placeholder="Tempel di sini…" spellcheck="false"></textarea>
+      <div id="impReport"></div>
+    </div>
+    <div class="foot">
+      <button class="ghost" id="impCheck">Periksa</button>
+      <button class="gobtn" id="impGo" disabled>Muat data</button>
+      <button class="ghost" data-close>Batal</button>
+      <span class="appendonly">Periksa dulu, baru muat. Setelah dimuat, tekan <b>Simpan file data</b>
+        dan commit <span class="keyprev">data/indicators.js</span>.</span>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
