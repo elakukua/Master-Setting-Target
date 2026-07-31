@@ -1,8 +1,8 @@
 /* ==========================================================================
    tblAsumsi  —  data/asumsi.js
    --------------------------------------------------------------------------
-   Arah dan Target Delta per indikator. Indikator yang TIDAK terdaftar di sini
-   dianggap Arah = Naik dengan Target Delta = target_delta_default.
+   Arah dan Target Delta per indikator. Yang TIDAK terdaftar di sini dianggap
+   Arah = Naik dengan Target Delta = target_delta_default.
    Nama indikator harus PERSIS sama dengan kolom Indicator di indicators.js.
    ========================================================================== */
 window.WVI_ASUMSI = {
