@@ -1,193 +1,82 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AIM+ AP Target Setting · Wahana Visi Indonesia</title>
-<meta name="description" content="Area Programme target setting decision workbook for the AIM+ cycle FY27–FY30. PEARL, Wahana Visi Indonesia.">
+<title>AIM+ Target Setting · Wahana Visi Indonesia</title>
+<meta name="description" content="SUMMARY dan ANALISIS AP untuk penetapan target Area Programme, siklus AIM+ FY27–FY30. PEARL, Wahana Visi Indonesia.">
 <meta name="color-scheme" content="light">
-
-<!-- Safety net: keeps the page sane even if the stylesheet never arrives. -->
 <style>
-  .scrim{display:none}
   #boot{font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;color:#3F3D4C;padding:34px 26px;max-width:720px}
   #boot h2{font-size:17px;color:#111222;margin:0 0 10px}
   #boot code{font-family:ui-monospace,Consolas,monospace;font-size:12px;background:#F3F2F0;padding:1px 5px;border-radius:2px}
-  #boot ul{padding-left:20px}
   #boot .bad{color:#B10831;font-weight:600}
 </style>
-
-<!-- Stylesheet: folder layout first, flat layout as a fallback. -->
 <link rel="stylesheet" href="assets/app.css"
       onerror="var l=document.createElement('link');l.rel='stylesheet';l.href='app.css';document.head.appendChild(l);">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23111222'/%3E%3Crect x='5' y='22' width='5' height='5' fill='%23FF5515'/%3E%3Crect x='13' y='15' width='5' height='12' fill='%23FF5515'/%3E%3Crect x='21' y='7' width='5' height='20' fill='%23155930'/%3E%3C/svg%3E">
 </head>
 <body>
 
-<!-- ========================= HEADER =========================
-     The logo is loaded from assets/logo.svg or assets/logo.png.
-     Drop the official WVI file in with either name and it appears;
-     without it the type lockup stands on its own.
-     ========================================================== -->
+<!-- Logo: taruh file resmi WVI sebagai assets/logo.svg atau assets/logo.png -->
 <header class="wvhead">
   <div class="wvhead-in">
     <div class="brand">
       <img id="wvLogo" class="logo" alt="World Vision" hidden>
       <div class="lock">
         <span class="org">Wahana Visi Indonesia</span>
-        <span class="sub">PEARL &nbsp;·&nbsp; AIM+ Area Programme Target Setting &nbsp;·&nbsp; FY27–FY30</span>
+        <span class="sub">PEARL &nbsp;·&nbsp; AIM+ Target Setting &nbsp;·&nbsp; FY27–FY30</span>
       </div>
     </div>
     <div class="wvhead-sp"></div>
-    <span class="chip" id="dataChip">loading…</span>
+    <span class="chip" id="dataChip">memuat…</span>
     <nav class="tools">
-      <button class="cbtn" id="btnMaster" title="Edit the data, the AP register and the outcome map">✎ Master setup</button>
-      <button class="cbtn" id="btnRefresh" title="Rebuilds every derived column, chart and card">↻ Rebuild</button>
-      <button class="cbtn" id="btnImport">⤓ Import</button>
-      <button class="cbtn" id="btnExport">⤒ Export</button>
-      <button class="cbtn" id="btnPrint">⎙ Print</button>
+      <button class="cbtn" id="btnSave" title="Unduh file data untuk di-commit ke repository">⤒ Simpan file data</button>
+      <button class="cbtn" id="btnCsv" title="Unduh tabel sesuai filter, siap dibuka di Excel">⤓ CSV</button>
+      <button class="cbtn" id="btnPrint">⎙ Cetak</button>
+      <button class="cbtn" id="btnReset" title="Buang perubahan lokal, muat ulang data repository">↺ Reset</button>
     </nav>
   </div>
 </header>
 
-<!-- ========================= SHEETS ========================= -->
 <div class="sheetwrap" id="sheets">
-  <div id="boot"><h2>Opening…</h2>
-  <p>Loading the AP register, the indicator catalogue and the submission data.</p></div>
+  <div id="boot"><h2>Memuat…</h2><p>Membaca konfigurasi, data submission, asumsi, dan pemetaan indikator.</p></div>
 </div>
 
-<!-- ========================= SHEET TABS ========================= -->
 <div class="tabbar noprint"><div class="tabbar-in" id="tabbar"></div></div>
-
-<!-- ========================= MODALS ========================= -->
-<div class="scrim" id="scrimImport">
-  <div class="modal">
-    <h3>Import submissions <button data-close>✕</button></h3>
-    <div class="body">
-      <p>Select the submission block in Excel (<b>without</b> the header row), copy, and paste below.
-         Tab-separated, 16 columns, in this order — the same order as <span class="keyprev">tblMaster</span> §2.1:</p>
-      <div class="colspec">Zonal ⇥ AP ⇥ AP_ID ⇥ Outcome ⇥ Code ⇥ Indicator ⇥ Num_Base ⇥ Den_Base ⇥ Pct_Base ⇥ Num_LOP ⇥ Den_LOP ⇥ Pct_LOP ⇥ Delta ⇥ AP_Proposal ⇥ Threshold ⇥ AP_vs_Threshold</div>
-      <p class="dim">Proportions may be written as <span class="keyprev">0.235</span> or <span class="keyprev">23.5%</span> — both are read as 23.5%.
-         An empty cell stays empty; it is never read as zero. Text is trimmed and cleaned.
-         An AP that is not yet on the register is added to it automatically with all five outcomes on.</p>
-      <textarea id="pasteBox" placeholder="Paste here…" spellcheck="false"></textarea>
-      <p id="pasteMsg" class="vmsg" style="display:none"></p>
-    </div>
-    <div class="foot">
-      <button class="gobtn" id="btnDoImport">Load into tblMaster</button>
-      <button class="ghost" data-close>Cancel</button>
-      <span class="appendonly">Import replaces the data and clears the decision log. Export the log first if you need it.</span>
-    </div>
-  </div>
-</div>
-
-<div class="scrim" id="scrimExport">
-  <div class="modal">
-    <h3>Export <button data-close>✕</button></h3>
-    <div class="body">
-      <p>CSV opens directly in Excel. To change what this site <i>publishes</i>, use
-         <b>Master setup → Save &amp; publish</b> instead: those downloads are the data files themselves.</p>
-      <div class="fgrid">
-        <div class="fg"><button class="ghost" id="expMaster" style="width:100%">Submission data (CSV)</button>
-          <div class="hlp">Every row, with the derived fields</div></div>
-        <div class="fg"><button class="ghost" id="expDec" style="width:100%">Decision record (CSV)</button>
-          <div class="hlp">All revisions, in the order logged</div></div>
-        <div class="fg"><button class="ghost" id="expJson" style="width:100%">Everything (JSON)</button>
-          <div class="hlp">Data and decisions in one file</div></div>
-      </div>
-    </div>
-    <div class="foot"><button class="ghost" data-close>Close</button>
-      <span class="appendonly">Files download to your machine. Nothing is sent anywhere.</span></div>
-  </div>
-</div>
-
-<div class="scrim" id="scrimLocked">
-  <div class="modal" style="max-width:520px">
-    <h3>Sheet is hidden <button data-close>✕</button></h3>
-    <div class="body">
-      <p><span id="lockedName" class="keyprev"></span> is a data sheet, hidden in the Excel build and held in
-         the data files that ship next to this page.</p>
-      <p class="dim">Everything on it is already rendered on sheets 01–08. To change it, use
-         <b>00_MASTER</b> — that is the same content with guard rails, and it can write the file back out for you.</p>
-    </div>
-    <div class="foot">
-      <button class="ghost" data-close>Understood</button>
-      <button class="gobtn" onclick="document.getElementById('scrimLocked').classList.remove('on');go('00_MASTER')">Open Master setup</button>
-    </div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 
 <script>
-/* ==================================================================
-   LOADER — tolerates either repository layout.
-
-     folder layout        flat layout
-     data/master.js       master.js
-     assets/app.js        app.js
-
-   Each file is tried in the folder location first, then in the root.
-   Whichever exists is used; the other is never requested twice.
-   Data files always load before the app, in order.
-   ================================================================== */
 (function(){
-  var QUEUE = [
-    ["data/ap-register.js", "ap-register.js"],
-    ["data/indicators.js",  "indicators.js"],
-    ["data/master.js",      "master.js"],
-    ["data/decisions.js",   "decisions.js"],
-    ["assets/app.js",       "app.js"]
-  ];
-  var found = [], failed = [];
-
-  function loadOne(candidates, done){
-    var i = 0;
-    (function attempt(){
-      if(i >= candidates.length){ done(false); return; }
-      var src = candidates[i++];
-      var s = document.createElement("script");
-      s.src = src;
-      s.async = false;
-      s.onload  = function(){ found.push(src); done(true); };
-      s.onerror = function(){ s.parentNode && s.parentNode.removeChild(s); attempt(); };
-      document.head.appendChild(s);
-    })();
+  var Q=[["data/config.js","config.js"],["data/indicators.js","indicators.js"],
+         ["data/asumsi.js","asumsi.js"],["data/pemetaan.js","pemetaan.js"],
+         ["assets/app.js","app.js"]];
+  var found=[],failed=[];
+  function one(c,done){var i=0;(function t(){
+    if(i>=c.length){done(false);return;}
+    var s=document.createElement("script");s.src=c[i++];s.async=false;
+    s.onload=function(){found.push(s.src);done(true);};
+    s.onerror=function(){s.parentNode&&s.parentNode.removeChild(s);t();};
+    document.head.appendChild(s);})();}
+  function next(n){ if(n>=Q.length){fin();return;}
+    one(Q[n],function(ok){ if(!ok) failed.push(Q[n][0].replace(/^.*\//,"")); next(n+1); }); }
+  function fin(){
+    if(failed.length) return rep();
+    if(typeof boot!=="function") return rep("app.js termuat tapi tidak mendefinisikan boot()");
+    if(document.readyState==="loading") return;
+    try{ boot(); }catch(e){ rep(e.message); }
   }
-
-  function next(n){
-    if(n >= QUEUE.length){ finish(); return; }
-    loadOne(QUEUE[n], function(ok){
-      if(!ok) failed.push(QUEUE[n][0].replace(/^.*\//, ""));
-      next(n + 1);
-    });
+  function rep(x){
+    var el=document.getElementById("boot"); if(!el)return;
+    el.innerHTML='<h2>Ada file yang tidak ditemukan</h2>'+
+      '<p>Halaman mencari tiap file di <code>data/</code> dan <code>assets/</code> lebih dulu, '+
+      'lalu di root repository. Yang tidak ada di keduanya:</p><ul>'+
+      failed.map(function(f){return '<li class="bad">'+f+'</li>';}).join('')+'</ul>'+
+      '<p>Yang berhasil dimuat:</p><ul>'+(found.length?found.map(function(f){
+        return '<li><code>'+f+'</code></li>';}).join(''):'<li>tidak ada</li>')+'</ul>'+
+      '<p>Periksa apakah semuanya sudah ter-commit dan namanya tidak kebawa tambahan '+
+      '<code> (1)</code> dari unduhan browser.</p>'+(x?'<p class="bad">'+x+'</p>':'');
   }
-
-  function finish(){
-    if(failed.length){ report(); return; }
-    if(typeof boot !== "function"){ report("app.js loaded but did not define boot()"); return; }
-    /* app.js registers itself on DOMContentLoaded. Because these scripts are
-       fetched after that event has already fired, start it here instead. */
-    if(document.readyState === "loading") return;   /* its own listener will run */
-    try{ boot(); }catch(e){ report(e.message); }
-  }
-
-  function report(extra){
-    var el = document.getElementById("boot");
-    if(!el) return;
-    el.innerHTML =
-      '<h2>Some files could not be found</h2>' +
-      '<p>The page looked for each file in two places — inside <code>data/</code> and ' +
-      '<code>assets/</code> first, then in the repository root. These were not in either:</p>' +
-      '<ul>' + failed.map(function(f){ return '<li class="bad">' + f + '</li>'; }).join('') + '</ul>' +
-      '<p>Loaded successfully:</p><ul>' +
-      (found.length ? found.map(function(f){ return '<li><code>' + f + '</code></li>'; }).join('')
-                    : '<li>none</li>') + '</ul>' +
-      '<p>Check that every file is committed, and that the filename has no extra characters — ' +
-      'a browser download often adds <code> (1)</code> to a name that already exists.</p>' +
-      (extra ? '<p class="bad">' + extra + '</p>' : '');
-  }
-
   next(0);
 })();
 </script>
