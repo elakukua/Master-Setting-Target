@@ -29,14 +29,14 @@ const ST_IND=[
  {v:"Belum ada data",          ic:"◧", cls:"s-belum",  desc:"Baseline atau endline masih 0"}
 ];
 const ST_THR=[
- {v:"Di atas threshold",  ic:"●", cls:"s-baik"},
- {v:"Di bawah threshold", ic:"▲", cls:"s-hati"},
+ {v:">= threshold",       ic:"●", cls:"s-baik"},
+ {v:"di bawah threshold", ic:"▲", cls:"s-hati"},
  {v:"Belum ada data",     ic:"◧", cls:"s-belum"}
 ];
 const ST_TGT=[
- {v:"Capai target",        ic:"●", cls:"s-baik"},
- {v:"Meleset dari target", ic:"▲", cls:"s-hati"},
- {v:"Belum ada data",      ic:"◧", cls:"s-belum"}
+ {v:">= target",      ic:"●", cls:"s-baik"},
+ {v:"dibawah target", ic:"▲", cls:"s-hati"},
+ {v:"Belum ada data", ic:"◧", cls:"s-belum"}
 ];
 const ICON={}; ST_IND.concat(ST_THR,ST_TGT).forEach(x=>{ICON[x.v]=x;});
 function pill(v){const x=ICON[v]||{ic:"–",cls:"s-belum"};
@@ -99,15 +99,15 @@ function recompute(){
        Aturannya "≥" dan "≤", jadi nilai yang sama persis dihitung TERCAPAI. */
     const EPS=1e-9;
     r._thr_status = end===0 ? "Belum ada data"
-      : (arah==="Turun" ? (end<=thr+EPS?"Di atas threshold":"Di bawah threshold")
-                        : (end>=thr-EPS?"Di atas threshold":"Di bawah threshold"));
+      : (arah==="Turun" ? (end<=thr+EPS?">= threshold":"di bawah threshold")
+                        : (end>=thr-EPS?">= threshold":"di bawah threshold"));
     r._delta = (base===0||end===0) ? null : end-base;
     r._tgt_status = r._delta===null ? "Belum ada data"
-      : (arah==="Turun" ? (r._delta<=tgt+EPS?"Capai target":"Meleset dari target")
-                        : (r._delta>=tgt-EPS?"Capai target":"Meleset dari target"));
+      : (arah==="Turun" ? (r._delta<=tgt+EPS?">= target":"dibawah target")
+                        : (r._delta>=tgt-EPS?">= target":"dibawah target"));
     r._status = (r._thr_status==="Belum ada data"||r._tgt_status==="Belum ada data") ? "Belum ada data"
-      : (r._thr_status==="Di atas threshold"&&r._tgt_status==="Capai target") ? "Sesuai Target/Threshold"
-      : (r._thr_status==="Di atas threshold"||r._tgt_status==="Capai target") ? "Ditinjau"
+      : (r._thr_status===">= threshold"&&r._tgt_status===">= target") ? "Sesuai Target/Threshold"
+      : (r._thr_status===">= threshold"||r._tgt_status===">= target") ? "Ditinjau"
       : "Perhatian";
     r._berlaku = berlakuOf(ind,ap);
     r._short = shortOf(ind);
@@ -179,9 +179,9 @@ const CLR={
 };
 const SER_IND=[["Sesuai Target/Threshold",CLR.baik],["Ditinjau",CLR.tinjau],
                ["Perhatian",CLR.hati],["Belum ada data",CLR.belum]];
-const SER_THR=[["Di atas threshold",CLR.baik],["Di bawah threshold",CLR.hati],
+const SER_THR=[[">= threshold",CLR.baik],["di bawah threshold",CLR.hati],
                ["Belum ada data",CLR.belum]];
-const SER_TGT=[["Capai target",CLR.baik],["Meleset dari target",CLR.hati],["Belum ada data",CLR.belum]];
+const SER_TGT=[[">= target",CLR.baik],["dibawah target",CLR.hati],["Belum ada data",CLR.belum]];
 
 function legend(series,extra){
   return '<div class="legend">'+series.map(s=>
@@ -722,16 +722,19 @@ function renderAnalisis(){
     return {label:c.short, v:d, target:targetOf(c.ind), tot:rs.length};
   }).filter(x=>x.tot>0);
 
+  /* urutan dan nama kolom persis seperti tblAnalisis di Master (7) */
   const COLS=[["Zonal","Zonal"],["Area Program","Area Program"],["Outcome","Outcome"],["Code","Code"],
-    ["Indicator","Indikator"],["Pct_Base","% Baseline"],["Pct_LOP","% Endline"],["Threshold","Threshold"],
-    ["_thr_status","Endline vs Threshold"],["_delta","Delta"],["_tgt_status","Delta vs Target"],
-    ["_arah","Arah"],["_target","Target Delta"],["_status","Status Indikator"],["_berlaku","Berlaku"]];
+    ["Indicator","Indikator"],["Pct_Base","% Baseline"],["Pct_LOP","% Endline (LOP)"],
+    ["Threshold","Threshold"],["_thr_status","Endline vs Threshold"],
+    ["_delta","Delta (Endline − Baseline)"],["_target","Target Delta"],
+    ["_tgt_status","Delta vs Target"],["_status","Status Indikator"],
+    ["_arah","Arah Indikator"],["_berlaku","Berlaku"]];
   const view=sortRows(rows);
   const cap=F.showAll?view.length:Math.min(view.length,150);
   const c=checks();
   const nInd=uniq(rows.map(r=>r.Indicator)).length;
-  const indAtas=uniq(rows.filter(r=>r._thr_status==="Di atas threshold").map(r=>r.Indicator)).length;
-  const indTarget=uniq(rows.filter(r=>r._tgt_status==="Capai target").map(r=>r.Indicator)).length;
+  const indAtas=uniq(rows.filter(r=>r._thr_status===">= threshold").map(r=>r.Indicator)).length;
+  const indTarget=uniq(rows.filter(r=>r._tgt_status===">= target").map(r=>r.Indicator)).length;
   const indSesuai=uniq(rows.filter(r=>r._status==="Sesuai Target/Threshold").map(r=>r.Indicator)).length;
   const indTinjau=uniq(rows.filter(r=>r._status==="Ditinjau").map(r=>r.Indicator)).length;
   const indHati=uniq(rows.filter(r=>r._status==="Perhatian").map(r=>r.Indicator)).length;
@@ -742,13 +745,13 @@ function renderAnalisis(){
   '<div class="cards">'+
     card("Area<br>Program",aps.length,"dari "+AP_LIST.length+" terdaftar","teal")+
     card("Zonal",uniq(rows.map(r=>r.Zonal)).length,"","neutral")+
-    card("Di atas<br>threshold",indAtas,"indikator, dari "+nInd,"teal")+
-    card("Di bawah<br>threshold",uniq(rows.filter(r=>r._thr_status==="Di bawah threshold")
+    card("&gt;= threshold",indAtas,"indikator, dari "+nInd,"teal")+
+    card("Di bawah<br>threshold",uniq(rows.filter(r=>r._thr_status==="di bawah threshold")
       .map(r=>r.Indicator)).length,"indikator","critical")+
     card("Sesuai Target<br>/ Threshold",cnt("_status","Sesuai Target/Threshold"),indSesuai+" indikator","ready")+
     card("Ditinjau",cnt("_status","Ditinjau"),indTinjau+" indikator","review")+
     card("Perhatian",cnt("_status","Perhatian"),indHati+" indikator","critical")+
-    card("Capai<br>target",cnt("_tgt_status","Capai target"),indTarget+" indikator","accent")+
+    card("&gt;= target",cnt("_tgt_status",">= target"),indTarget+" indikator","accent")+
   '</div>'+
   '<div class="legendrow"><span class="lbl">Legend</span>'+
     ST_IND.map(s=>'<span class="pill '+s.cls+'"><span class="ic">'+s.ic+'</span>'+s.v+'</span> '+
@@ -805,10 +808,10 @@ function renderAnalisis(){
       '<td>'+pill(r._thr_status)+'</td>'+
       '<td class="r '+(r._wrongway?"wrongway":(r._delta>0?"up":r._delta<0?"down":"dim"))+'"'+
         (r._wrongway?' title="Delta bergerak berlawanan dengan arah indikator"':'')+'>'+ppD(r._delta)+'</td>'+
-      '<td>'+pill(r._tgt_status)+'</td>'+
-      '<td class="c '+(r._arah==="Turun"?"turun":"naik")+'">'+esc(r._arah)+'</td>'+
       '<td class="r dim">'+(r._target>0?"+":"")+(r._target*100).toFixed(0)+'pp</td>'+
+      '<td>'+pill(r._tgt_status)+'</td>'+
       '<td>'+pill(r._status)+'</td>'+
+      '<td class="c '+(r._arah==="Turun"?"turun":"naik")+'">'+esc(r._arah)+'</td>'+
       '<td class="c '+(r._berlaku==="No"?"nocell":"dim")+'">'+esc(r._berlaku)+'</td></tr>').join('')+
     '</tbody></table></div>'+
   (cap<view.length?'<div class="morebar"><button class="ghost" data-act="showAll">Tampilkan seluruh '+
@@ -883,13 +886,13 @@ function renderAsumsi(){
 
   '<div class="slabel">Akibatnya pada analisis</div>'+
   '<div class="tscroll"><table class="gt"><thead><tr><th>Arah</th><th class="r">Indikator</th>'+
-    '<th class="r">Capai target</th><th class="r">Meleset</th></tr></thead><tbody>'+
+    '<th class="r">&gt;= target</th><th class="r">dibawah target</th></tr></thead><tbody>'+
     ["Naik","Turun"].map(ar=>{
       const rs=S.rows.filter(r=>r._arah===ar);
       return '<tr><td><b class="'+(ar==="Turun"?"turun":"naik")+'">'+ar+'</b></td>'+
         '<td class="r">'+uniq(rs.map(r=>r.Indicator)).length+'</td>'+
-        '<td class="r">'+rs.filter(r=>r._tgt_status==="Capai target").length+'</td>'+
-        '<td class="r">'+rs.filter(r=>r._tgt_status==="Meleset dari target").length+'</td></tr>';
+        '<td class="r">'+rs.filter(r=>r._tgt_status===">= target").length+'</td>'+
+        '<td class="r">'+rs.filter(r=>r._tgt_status==="dibawah target").length+'</td></tr>';
     }).join('')+'</tbody></table></div>'+
   '<p class="tcap">Mengubah Arah membalik seluruh logika status untuk indikator itu: '+
    'pada arah <b>Turun</b> endline dinilai tercapai bila <b>≤</b> threshold, dan delta tercapai bila <b>≤</b> Target Delta.</p>';
