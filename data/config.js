@@ -2,12 +2,10 @@
    Konfigurasi  —  data/config.js
    --------------------------------------------------------------------------
    Judul, versi, tanggal data, daftar AP dan Outcome, katalog indikator.
-   Daftar AP dan Outcome bersifat statis: kalau ada AP baru, tambahkan di sini
-   dan di pemetaan.js.
    ========================================================================== */
 window.WVI_CONFIG = {
   cycle: "Target Setting FY27–FY30",
-  version: "v2.0",
+  version: "v2.1",
   data_date: "31 Jul 2026",
   owner: "PEARL — Wahana Visi Indonesia",
   access_code: "wvipearl",
