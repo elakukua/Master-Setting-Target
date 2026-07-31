@@ -307,16 +307,12 @@ function buildFrames(){
    '<section class="sheet" id="sh_'+sh.id+'">'+
     '<div class="hdr"><div class="hdr-top">'+
       '<h1 class="title">'+esc(sh.title)+'</h1>'+
-      (sh.cfg?'<span class="cfgflag">SHEET KONFIGURASI — bukan halaman laporan. Diisi oleh PEARL.</span>':'')+
-      '<div class="hdr-right"><div class="cycle">'+esc(CFG.cycle)+'</div>'+
-      '<div class="stagebar" data-ver>'+esc(CFG.version)+'</div></div>'+
+      (sh.cfg?'<span class="cfgflag">SHEET KONFIGURASI — diisi oleh PEARL</span>':'')+
+      '<div class="hdr-right"><div class="stagebar" data-ver>'+esc(CFG.version)+'</div></div>'+
     '</div><div class="crumb" data-crumb></div></div>'+
     '<div class="rule4"></div>'+
     '<div class="pad" data-body></div>'+
-    '<div class="ftr"><div class="ftr-l">PEARL · Wahana Visi Indonesia · Draft — tidak untuk sirkulasi eksternal'+
-      ' &nbsp;·&nbsp; Data per '+esc(CFG.data_date)+'</div>'+
-      '<div class="ftr-r"><span>Halaman:</span>'+SHEETS.filter(x=>x.id!==sh.id).map(x=>
-        '<a href="#" data-go="'+x.id+'">'+esc(x.tab)+'</a>').join('')+'</div></div>'+
+    '<div class="ftr"><div class="ftr-l">Draft — tidak untuk sirkulasi eksternal</div></div>'+
    '</section>').join('');
   document.getElementById("tabbar").innerHTML=SHEETS.map(sh=>
     '<button class="tab" data-tab="'+sh.id+'"><span class="dot" style="background:'+sh.c+'"></span>'+
@@ -379,12 +375,8 @@ function filterBand(withStatus){
       ST_IND.map(s=>({v:s.v,n:all.filter(r=>r._status===s.v).length})),true):'')+
     slicerBox("Berlaku","berlaku",["Yes","No","(Semua)"].map(v=>({v:v,
       n:v==="(Semua)"?all.length:all.filter(r=>r._berlaku===v).length})),false)+
-    '</div><div class="fnote">'+
-      'Filter di sini memfilter <b>tabel dan seluruh grafik sekaligus</b> — berbeda dari slicer Excel, '+
-      'yang hanya memfilter tabel. '+
-      (hidden>0?'<b>'+n0(hidden)+' baris</b> sedang disembunyikan oleh filter Berlaku = '+esc(F.berlaku)+'. ':'')+
-      'Klik ⌧ untuk membersihkan satu filter.'+
-    '</div></div>';
+    '</div>'+(hidden>0?'<div class="fnote"><b>'+n0(hidden)+' baris</b> disembunyikan oleh filter Berlaku = '+
+      esc(F.berlaku)+'.</div>':'')+'</div>';
 }
 function activeLine(){
   const b=[];
@@ -432,10 +424,6 @@ function renderSummary(){
   const g2=OUTCOMES.map(o=>({label:o,
     vals:ZONALS.map(z=>rows.filter(r=>r.Outcome===o&&r.Zonal===z).length)}));
 
-  /* G3 · keputusan AP */
-  const g3=[{label:"Set target",v:setT},{label:"Monitor Indicator",v:mon},
-            {label:"Belum diisi",v:kosong,hl:CLR.hati}];
-
   /* G4 · rata-rata baseline vs threshold per indikator */
   const g4=S.cat.map(c=>{
     const rs=rows.filter(r=>r.Indicator===c.ind);
@@ -448,7 +436,7 @@ function renderSummary(){
     ["Indicator","Indikator"],["Num_Base","Num Base"],["Den_Base","Den Base"],["Pct_Base","% Baseline"],
     ["Num_LOP","Num LOP"],["Den_LOP","Den LOP"],["Pct_LOP","% LOP"],["Delta","Delta"],
     ["AP_Decision","AP Decision"],["Threshold","Threshold"],["AP_vs_Threshold","AP ≥ Threshold?"],
-    ["Delta_LOP_Base","Delta LOP−Base"],["Row_ID","Row ID"]];
+    ["Row_ID","Row ID"]];
   const view=sortRows(rows);
   const cap=F.showAll?view.length:Math.min(view.length,150);
 
@@ -456,13 +444,10 @@ function renderSummary(){
 
   '<div class="slabel">Ringkasan nasional'+activeLine()+'</div>'+
   '<div class="cards">'+
-    card("Baris<br>indikator",n0(n),(n!==S.rows.length?"dari "+n0(S.rows.length)+" baris":"seluruh submission"),"accent")+
-    card("Area<br>Program",aps.length,"dari "+AP_LIST.length+" terdaftar","teal")+
-    card("Indikator<br>unik",inds.length,"dari "+S.cat.length+" di pemetaan","neutral")+
-    card("Ada<br>baseline",n0(ada),(n?(ada/n*100).toFixed(1)+"%":"—"),"ready")+
-    card("Belum ada<br>baseline",n0(belum),(n?(belum/n*100).toFixed(1)+"%":"—"),"belum")+
+    card("Ada<br>baseline",n0(ada),(n?(ada/n*100).toFixed(1)+"% dari "+n0(n)+" baris":"—"),"ready")+
     card("Set<br>target",n0(setT),"","review")+
-    card("Monitor<br>Indicator",n0(mon),n0(kosong)+" belum diisi","monitor")+
+    card("Monitor<br>Indicator",n0(mon),"","monitor")+
+    card("Belum<br>diisi",n0(kosong),"","belum")+
   '</div>'+
 
   '<div class="grid2" style="margin-top:22px">'+
@@ -474,10 +459,8 @@ function renderSummary(){
         legend(ZONALS.map((z,i)=>[z,CLR.zonal[i%4]]))+'</div></div>'+
   '</div>'+
 
-  '<div class="grid2" style="margin-top:20px">'+
-    '<div><div class="slabel" style="margin-top:0">G3 · Keputusan AP</div>'+
-      '<div class="chartbox">'+chartBar(g3,CLR.baseline,{labW:150,bh:24})+'</div></div>'+
-    '<div><div class="slabel" style="margin-top:0">G4 · Baseline vs Threshold per indikator</div>'+
+  '<div style="margin-top:20px">'+
+    '<div><div class="slabel" style="margin-top:0">G3 · Baseline vs Threshold per indikator</div>'+
       '<div class="chartbox">'+chartPair(g4,["Baseline",CLR.baseline],["Threshold",CLR.threshold],{labW:250})+
         legend([["Rata-rata Baseline",CLR.baseline],["Threshold",CLR.threshold]])+
         '<p class="chartnote">Rata-rata antar Area Program, hanya baris dengan nilai &gt; 0. '+
@@ -486,10 +469,10 @@ function renderSummary(){
 
   '<div class="slabel">Tabel lengkap semua indikator '+
     '<span class="hint">'+n0(view.length)+' baris'+(cap<view.length?' · menampilkan '+cap:'')+
-    ' · klik judul kolom untuk mengurutkan</span></div>'+
+    '</span></div>'+
   '<div class="tscroll"><table class="gt tight"><thead><tr>'+
     COLS.map(c=>th(c[1],c[0],(["Num_Base","Den_Base","Pct_Base","Num_LOP","Den_LOP","Pct_LOP",
-      "Delta","Threshold","Delta_LOP_Base"].indexOf(c[0])>=0)?"r":"")).join('')+
+      "Delta","Threshold"].indexOf(c[0])>=0)?"r":"")).join('')+
     '</tr></thead><tbody>'+
     view.slice(0,cap).map(r=>{
       const dec=r.AP_vs_Threshold;
@@ -508,16 +491,13 @@ function renderSummary(){
       '<td class="'+(N(r.Threshold)===0?"miss":"r")+'">'+pctT(r.Threshold)+'</td>'+
       '<td class="'+(dec==="Monitor Indicator"?"moncell":(isBlank(dec)||dec==="0"||dec===0)?"miss":"")+'">'+
         ((isBlank(dec)||dec==="0"||dec===0)?"belum diisi":esc(dec))+'</td>'+
-      '<td class="r '+(N(r.Delta_LOP_Base)>0?"up":N(r.Delta_LOP_Base)<0?"down":"dim")+'">'+
-        (N(r.Delta_LOP_Base)===0?"—":(N(r.Delta_LOP_Base)*100).toFixed(1)+"pp")+'</td>'+
       '<td class="code dim'+(r._iddupe?' miss':'')+'">'+esc(r.Row_ID)+'</td></tr>';
     }).join('')+
     '</tbody></table></div>'+
   (cap<view.length?'<div class="morebar"><button class="ghost" data-act="showAll">Tampilkan seluruh '+
     n0(view.length)+' baris</button></div>':'')+
-  '<p class="tcap">Sel merah pada % Baseline dan Threshold menandai nilai <b>0</b>, yang menurut konvensi PEARL '+
-   'berarti <b>belum ada data</b> — bukan nol sebenarnya. Baris abu-abu miring adalah baris dengan '+
-   '<b>Berlaku = No</b> pada pemetaan.</p>';
+  '<p class="tcap">Sel merah = nilai <b>0</b>, yang menurut konvensi PEARL berarti <b>belum ada data</b>. '+
+   'Baris abu-abu miring: <b>Berlaku = No</b>.</p>';
 }
 /* ==========================================================================
    HALAMAN 2 — ANALISIS AP
@@ -566,10 +546,10 @@ function renderAnalisis(){
 
   '<div class="slabel">Ringkasan status'+activeLine()+'</div>'+
   '<div class="cards">'+
-    card("Baik",cnt("_status","Baik"),"threshold ✓ dan target ✓","ready")+
-    card("Perlu<br>ditinjau",cnt("_status","Perlu ditinjau"),"salah satu tercapai","review")+
-    card("Perlu<br>perhatian",cnt("_status","Perlu perhatian"),"keduanya belum","critical")+
-    card("Belum<br>ada data",cnt("_status","Belum ada data"),(n?(cnt("_status","Belum ada data")/n*100).toFixed(1)+"% dari baris":""),"belum")+
+    card("Baik",cnt("_status","Baik"),"","ready")+
+    card("Perlu<br>ditinjau",cnt("_status","Perlu ditinjau"),"","review")+
+    card("Perlu<br>perhatian",cnt("_status","Perlu perhatian"),"","critical")+
+    card("Belum<br>ada data",cnt("_status","Belum ada data"),(n?(cnt("_status","Belum ada data")/n*100).toFixed(0)+"% dari "+n0(n)+" baris":""),"belum")+
     card("Tercapai<br>threshold",cnt("_thr_status","Tercapai"),cnt("_thr_status","Tidak tercapai")+" tidak tercapai","teal")+
     card("Capai<br>target",cnt("_tgt_status","Capai target"),cnt("_tgt_status","Meleset dari target")+" meleset","accent")+
   '</div>'+
@@ -580,17 +560,17 @@ function renderAnalisis(){
       (CFG.target_delta*100).toFixed(0)+'pp</b></span></div>'+
 
   '<div class="grid2" style="margin-top:22px">'+
-    '<div><div class="slabel" style="margin-top:0">G5 · Status indikator per Area Program</div>'+
+    '<div><div class="slabel" style="margin-top:0">G4 · Status indikator per Area Program</div>'+
       '<div class="chartbox">'+chartStack(g5,SER_IND,{pct100:true,labW:138})+legend(SER_IND)+'</div></div>'+
-    '<div><div class="slabel" style="margin-top:0">G6 · Endline vs Threshold per Area Program</div>'+
+    '<div><div class="slabel" style="margin-top:0">G5 · Endline vs Threshold per Area Program</div>'+
       '<div class="chartbox">'+chartStack(g6,SER_THR,{pct100:true,labW:138})+legend(SER_THR)+
-      '<p class="chartnote">Urutan baris sama dengan G5, jadi kedua grafik bisa dibaca berpasangan.</p></div></div>'+
+      '<p class="chartnote">Urutan baris sama dengan G4, jadi kedua grafik bisa dibaca berpasangan.</p></div></div>'+
   '</div>'+
 
   '<div class="grid2" style="margin-top:20px">'+
-    '<div><div class="slabel" style="margin-top:0">G7 · Delta vs Target per indikator</div>'+
+    '<div><div class="slabel" style="margin-top:0">G6 · Delta vs Target per indikator</div>'+
       '<div class="chartbox">'+chartStack(g7,SER_TGT,{pct100:true,labW:250,bh:12,gap:6})+legend(SER_TGT)+'</div></div>'+
-    '<div><div class="slabel" style="margin-top:0">G8 · Delta rata-rata vs Target Delta</div>'+
+    '<div><div class="slabel" style="margin-top:0">G7 · Delta rata-rata vs Target Delta</div>'+
       '<div class="chartbox">'+chartDiverge(g8,{labW:250})+
         legend([["Delta rata-rata",CLR.endline]],'<div><i style="background:'+CLR.ref+';width:3px"></i>Target Delta</div>')+
         '<p class="chartnote">Delta rata-rata hanya dari baris yang punya baseline dan endline. '+
@@ -621,10 +601,10 @@ function renderAnalisis(){
     '</tbody></table></div>'+
   (cap<view.length?'<div class="morebar"><button class="ghost" data-act="showAll">Tampilkan seluruh '+
     n0(view.length)+' baris</button></div>':'')+
-  '<p class="tcap">Delta yang ditandai <span class="wrongway">merah tebal</span> bergerak '+
-   '<b>berlawanan</b> dengan arah indikator — kasus yang paling mudah terlewat saat membaca cepat. '+
-   'Arah dan Target Delta diambil dari <a href="#" data-go="ASUMSI">Asumsi Indikator</a>; '+
-   'Berlaku dari <a href="#" data-go="PEMETAAN">Pemetaan Indikator</a>.</p>'+
+  '<p class="tcap">Delta <span class="wrongway">merah tebal</span> bergerak <b>berlawanan</b> '+
+   'dengan arah indikator. Arah dan Target Delta diatur di '+
+   '<a href="#" data-go="ASUMSI">Asumsi Indikator</a>, Berlaku di '+
+   '<a href="#" data-go="PEMETAAN">Pemetaan Indikator</a>.</p>'+
 
   (c.comboDupe>0?
   '<div class="slabel">Duplikat AP × indikator <span class="hint">tidak tertangkap oleh cek Row ID</span></div>'+
@@ -691,15 +671,13 @@ function renderAsumsi(){
 
   '<div class="slabel">Akibatnya pada analisis</div>'+
   '<div class="tscroll"><table class="gt"><thead><tr><th>Arah</th><th class="r">Indikator</th>'+
-    '<th class="r">Baris</th><th class="r">Capai target</th><th class="r">Meleset</th>'+
-    '<th class="r">Belum ada data</th></tr></thead><tbody>'+
+    '<th class="r">Capai target</th><th class="r">Meleset</th></tr></thead><tbody>'+
     ["Naik","Turun"].map(ar=>{
       const rs=S.rows.filter(r=>r._arah===ar);
       return '<tr><td><b class="'+(ar==="Turun"?"turun":"naik")+'">'+ar+'</b></td>'+
-        '<td class="r">'+uniq(rs.map(r=>r.Indicator)).length+'</td><td class="r">'+rs.length+'</td>'+
+        '<td class="r">'+uniq(rs.map(r=>r.Indicator)).length+'</td>'+
         '<td class="r">'+rs.filter(r=>r._tgt_status==="Capai target").length+'</td>'+
-        '<td class="r">'+rs.filter(r=>r._tgt_status==="Meleset dari target").length+'</td>'+
-        '<td class="r dim">'+rs.filter(r=>r._tgt_status==="Belum ada data").length+'</td></tr>';
+        '<td class="r">'+rs.filter(r=>r._tgt_status==="Meleset dari target").length+'</td></tr>';
     }).join('')+'</tbody></table></div>'+
   '<p class="tcap">Mengubah Arah membalik seluruh logika status untuk indikator itu: '+
    'pada arah <b>Turun</b> endline dinilai tercapai bila <b>≤</b> threshold, dan delta tercapai bila <b>≤</b> Target Delta.</p>';
@@ -720,10 +698,8 @@ function renderPemetaan(){
     '<span class="keyprev">Area Program</span> di data.</div>'+
 
   '<div class="health" style="margin-top:14px">'+
-    '<div class="m">Indikator<b>'+P.rows.length+'</b></div>'+
-    '<div class="m">Area Program<b>'+P.aps.length+'</b></div>'+
-    '<div class="m">Berlaku (Yes)<b style="color:var(--green)">'+n0(yes)+'</b></div>'+
-    '<div class="m">Tidak berlaku (No)<b style="color:var(--grey)">'+n0(tot-yes)+'</b></div>'+
+    '<div class="m">Berlaku<b style="color:var(--green)">'+n0(yes)+'</b></div>'+
+    '<div class="m">Tidak berlaku<b style="color:var(--grey)">'+n0(tot-yes)+'</b></div>'+
     '<div class="m">Cek nama AP<b>'+(unknown.length
       ?'<span class="ichip no">▲ '+esc(unknown.join(", "))+'</span>'
       :'<span class="ichip ok">● semua dikenal</span>')+'</b></div>'+
