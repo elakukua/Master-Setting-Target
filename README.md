@@ -6,6 +6,35 @@ PEARL · Wahana Visi Indonesia.
 Sembilan lembar laporan (`HOME`, `01`–`08`) plus satu lembar setup (`00_MASTER`).
 Tanpa build step, tanpa dependency, tanpa server — cukup HTML, CSS, dan satu file JavaScript.
 
+| Lembar | Menjawab apa |
+|---|---|
+| `HOME` | Cakupan siklus dan sejauh mana target sudah disetujui. Tidak memuat informasi kualitas data — submission masih bergerak, jadi halaman ini berorientasi hasil. |
+| `01_NATIONAL` | **Tren antar AP dari data tingkat nasional.** AP mana yang mengusulkan pergerakan seberapa jauh, dan apakah usulannya mencapai threshold. |
+| `02_ZONAL` | **Perbandingan antar indikator di dalam satu zonal.** Indikator mana yang diusulkan mendarat di threshold, mana yang dibiarkan jauh tertinggal. |
+| `03_AP` | Dossier satu AP untuk dibawa ke workshop, 30 baris tetap, satu halaman A4. |
+| `04_OUTCOME` | Satu outcome menyeluruh di semua AP, untuk diskusi sektor. |
+| `05_INDICATOR` | Satu baris indikator secara forensik, dengan definisi dan riwayat keputusannya. |
+| `06_DECISIONS` | Log keputusan, append-only. Satu-satunya tempat mencatat. |
+| `07_DATAQUALITY` | Daftar koreksi untuk DMEAL. Sengaja tidak ditampilkan di HOME. |
+| `08_REFERENCE` | Definisi indikator, threshold, legenda, FAQ, QA checklist. |
+
+---
+
+## 0 · Kode akses
+
+Halaman dibuka dengan kode **`wvipearl`**. Kode diminta sekali per sesi browser.
+
+> **Ini pagar sopan, bukan pengamanan.** Repository-nya publik, jadi siapa pun yang membuka
+> `assets/app.js` atau folder `data/` di GitHub bisa membaca kodenya dan seluruh datanya
+> tanpa melewati halaman ini. Fungsinya hanya mencegah orang yang tidak sengaja menemukan
+> tautannya ikut membaca. Selama isinya masih angka kerja yang belum final, itu cukup.
+>
+> Kalau suatu saat isinya tidak boleh terbaca publik, kode di halaman tidak akan menolong —
+> yang diperlukan: repository privat (GitHub Pages untuk repo privat perlu paket Team ke atas),
+> hosting internal WVI di belakang OneLogin, atau tidak menaruh angka itu di situs publik sama sekali.
+
+Mengubah kodenya: cari `GATE_CODE` di `assets/app.js`, ganti isinya, commit.
+
 ---
 
 ## 1 · Publikasi ke GitHub Pages
@@ -95,6 +124,36 @@ dan ada kartu **Not applicable** di `01_NATIONAL`.
 
 ---
 
+## 4b · Cara `01_NATIONAL` dan `02_ZONAL` membandingkan
+
+Dua halaman itu tidak membandingkan persentase mentah antar indikator, karena stunting 14%
+dan literasi 80% bukan skala yang sama, dan indikator reduksi bergerak ke arah berlawanan.
+Yang dibandingkan adalah dua ukuran yang aman terhadap arah dan skala:
+
+**Jarak ke threshold** (satuan poin persentase, `pp`). Diukur ke arah yang dianggap perbaikan,
+jadi indikator reduksi — stunting, kekerasan, perkawinan anak — berada di skala yang sama
+dengan indikator kenaikan. **0 pp berarti threshold tercapai.**
+
+**Gap closure.** Bagian dari jarak baseline→threshold yang ditutup oleh target usulan:
+
+```
+gap closure = (target − baseline) / (threshold − baseline)      arah disesuaikan
+```
+
+100% artinya target mendarat tepat di threshold, di atas 100% melampauinya, di bawah 100%
+belum sampai. Ini yang membuat ambisi 17 AP dan 26 indikator bisa dijajarkan.
+
+Tiga penjagaan supaya angkanya tidak menipu:
+
+- **median, bukan rata-rata** — satu indikator ekstrem tidak bisa menggeser penilaian satu AP
+- **gap di bawah 1 pp tidak dihitung sebagai rasio** — baseline yang sudah nyaris menyentuh
+  threshold akan menghasilkan rasio liar; baris seperti itu dinilai cukup dari tercapai atau tidak
+- **rasio dibatasi 200%**, dan baris dengan proporsi di luar 0–100% dikeluarkan dari kedua
+  ukuran ini — kesalahan input tidak boleh menyetir tampilan hasil. Baris itu tetap muncul
+  utuh di `07_DATAQUALITY`.
+
+---
+
 ## 5 · Format `data/master.js`
 
 ```js
@@ -166,4 +225,5 @@ Nama AP, kode OIOS, definisi indikator, dan nilai threshold pada rilis ini masih
 **placeholder yang masuk akal**, bukan angka AIM+ resmi. Ganti keempat file di `data/`
 dengan submission asli sebelum dipakai untuk keputusan.
 
+Versi: `v1.1` · 31 Juli 2026 — kode akses, HOME diringkas, `01` menjadi tren antar AP, `02` menjadi perbandingan indikator.
 Versi: `v1.0` · 31 Juli 2026 · disusun mengikuti *AIM+ AP Target Setting Decision Workbook — Build Specification v1.0*.
