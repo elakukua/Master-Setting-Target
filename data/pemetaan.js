@@ -1,9 +1,8 @@
 /* ==========================================================================
    tblPemetaan  —  data/pemetaan.js   (26 indikator × 17 AP)
    --------------------------------------------------------------------------
-   Matriks Yes/No: apakah indikator itu berlaku untuk AP tersebut.
+   Matriks Yes/No: apakah indikator berlaku untuk AP tersebut.
    Kombinasi yang tidak ada di sini dianggap Yes.
-   Nama kolom AP harus PERSIS sama dengan kolom Area Program di indicators.js.
    ========================================================================== */
 window.WVI_PEMETAAN = {
   aps: ["Bengkayang", "Kubu Raya", "Landak", "Ende", "NADA", "Manggarai", "Manggarai Timur", "Belu", "Malaka", "SBD", "TTS", "Biak", "Sentani-Sarmi", "Simokerto", "Nias Selatan", "Lombok", "Jakarta Utara"],
