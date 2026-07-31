@@ -29,9 +29,9 @@ const ST_IND=[
  {v:"Belum ada data",          ic:"◧", cls:"s-belum",  desc:"Baseline atau endline masih 0"}
 ];
 const ST_THR=[
- {v:"Tercapai",       ic:"●", cls:"s-baik"},
- {v:"Tidak tercapai", ic:"▲", cls:"s-hati"},
- {v:"Belum ada data", ic:"◧", cls:"s-belum"}
+ {v:"Di atas threshold",  ic:"●", cls:"s-baik"},
+ {v:"Di bawah threshold", ic:"▲", cls:"s-hati"},
+ {v:"Belum ada data",     ic:"◧", cls:"s-belum"}
 ];
 const ST_TGT=[
  {v:"Capai target",        ic:"●", cls:"s-baik"},
@@ -99,15 +99,15 @@ function recompute(){
        Aturannya "≥" dan "≤", jadi nilai yang sama persis dihitung TERCAPAI. */
     const EPS=1e-9;
     r._thr_status = end===0 ? "Belum ada data"
-      : (arah==="Turun" ? (end<=thr+EPS?"Tercapai":"Tidak tercapai")
-                        : (end>=thr-EPS?"Tercapai":"Tidak tercapai"));
+      : (arah==="Turun" ? (end<=thr+EPS?"Di atas threshold":"Di bawah threshold")
+                        : (end>=thr-EPS?"Di atas threshold":"Di bawah threshold"));
     r._delta = (base===0||end===0) ? null : end-base;
     r._tgt_status = r._delta===null ? "Belum ada data"
       : (arah==="Turun" ? (r._delta<=tgt+EPS?"Capai target":"Meleset dari target")
                         : (r._delta>=tgt-EPS?"Capai target":"Meleset dari target"));
     r._status = (r._thr_status==="Belum ada data"||r._tgt_status==="Belum ada data") ? "Belum ada data"
-      : (r._thr_status==="Tercapai"&&r._tgt_status==="Capai target") ? "Sesuai Target/Threshold"
-      : (r._thr_status==="Tercapai"||r._tgt_status==="Capai target") ? "Ditinjau"
+      : (r._thr_status==="Di atas threshold"&&r._tgt_status==="Capai target") ? "Sesuai Target/Threshold"
+      : (r._thr_status==="Di atas threshold"||r._tgt_status==="Capai target") ? "Ditinjau"
       : "Perhatian";
     r._berlaku = berlakuOf(ind,ap);
     r._short = shortOf(ind);
@@ -177,7 +177,8 @@ const CLR={
 };
 const SER_IND=[["Sesuai Target/Threshold",CLR.baik],["Ditinjau",CLR.tinjau],
                ["Perhatian",CLR.hati],["Belum ada data",CLR.belum]];
-const SER_THR=[["Tercapai",CLR.baik],["Tidak tercapai",CLR.hati],["Belum ada data",CLR.belum]];
+const SER_THR=[["Di atas threshold",CLR.baik],["Di bawah threshold",CLR.hati],
+               ["Belum ada data",CLR.belum]];
 const SER_TGT=[["Capai target",CLR.baik],["Meleset dari target",CLR.hati],["Belum ada data",CLR.belum]];
 
 function legend(series,extra){
@@ -438,10 +439,6 @@ const th = (label,key,cls) => '<th class="'+(cls||"")+(F.sort===key?" sorted":""
 function renderSummary(){
   const rows=filtered();
 
-  /* G2 · komposisi indikator per outcome × zonal */
-  const g2=OUTCOMES.map(o=>({label:o,
-    vals:ZONALS.map(z=>rows.filter(r=>r.Outcome===o&&r.Zonal===z).length)}));
-
   /* G4 · rata-rata baseline vs threshold per indikator */
   const g4=S.cat.map(c=>{
     const rs=rows.filter(r=>r.Indicator===c.ind);
@@ -460,10 +457,7 @@ function renderSummary(){
 
   return filterBand(false)+
 
-  '<div class="grid2" style="margin-top:18px">'+
-    '<div><div class="slabel" style="margin-top:0">Komposisi indikator per Outcome</div>'+
-      '<div class="chartbox">'+chartStack(g2,ZONALS.map((z,i)=>[z,CLR.zonal[i%4]]),{labW:70,bh:22,gap:12})+
-        legend(ZONALS.map((z,i)=>[z,CLR.zonal[i%4]]))+'</div></div>'+
+  '<div style="margin-top:18px">'+
     '<div><div class="slabel" style="margin-top:0">Baseline vs Threshold per indikator</div>'+
       '<div class="chartbox">'+chartPair(g4,["Baseline",CLR.baseline],["Threshold",CLR.threshold],{labW:250})+
         legend([["Rata-rata Baseline",CLR.baseline],["Threshold",CLR.threshold]])+
@@ -520,10 +514,20 @@ function renderAnalisis(){
       score:rs.filter(r=>r._status==="Sesuai Target/Threshold"||r._status==="Ditinjau").length/(rs.length||1)};
   }).sort((a,b)=>b.score-a.score);
 
-  /* G6 · endline vs threshold per AP — urutan sama dengan G5 supaya bisa dibaca berpasangan */
+  /* endline vs threshold per AP — urutan sama dengan grafik status supaya bisa dibaca berpasangan */
   const g6=g5.map(x=>{
     const rs=rows.filter(r=>r["Area Program"]===x.label);
     return {label:x.label, vals:ST_THR.map(s=>rs.filter(r=>r._thr_status===s.v).length)};
+  });
+  /* ringkasan yang sama, dilihat per Outcome */
+  const ocRows=OUTCOMES.filter(o=>rows.some(r=>r.Outcome===o));
+  const gOcStat=ocRows.map(o=>{
+    const rs=rows.filter(r=>r.Outcome===o);
+    return {label:o, vals:ST_IND.map(s=>rs.filter(r=>r._status===s.v).length)};
+  });
+  const gOcThr=ocRows.map(o=>{
+    const rs=rows.filter(r=>r.Outcome===o);
+    return {label:o, vals:ST_THR.map(s=>rs.filter(r=>r._thr_status===s.v).length)};
   });
 
   /* G7 · delta vs target per indikator */
@@ -548,9 +552,11 @@ function renderAnalisis(){
   const cap=F.showAll?view.length:Math.min(view.length,150);
   const c=checks();
   const nInd=uniq(rows.map(r=>r.Indicator)).length;
-  const indTercapai=uniq(rows.filter(r=>r._thr_status==="Tercapai").map(r=>r.Indicator)).length;
+  const indAtas=uniq(rows.filter(r=>r._thr_status==="Di atas threshold").map(r=>r.Indicator)).length;
   const indTarget=uniq(rows.filter(r=>r._tgt_status==="Capai target").map(r=>r.Indicator)).length;
   const indSesuai=uniq(rows.filter(r=>r._status==="Sesuai Target/Threshold").map(r=>r.Indicator)).length;
+  const indTinjau=uniq(rows.filter(r=>r._status==="Ditinjau").map(r=>r.Indicator)).length;
+  const indHati=uniq(rows.filter(r=>r._status==="Perhatian").map(r=>r.Indicator)).length;
 
   return filterBand(true)+
 
@@ -558,10 +564,12 @@ function renderAnalisis(){
   '<div class="cards">'+
     card("Area<br>Program",aps.length,"dari "+AP_LIST.length+" terdaftar","teal")+
     card("Zonal",uniq(rows.map(r=>r.Zonal)).length,"","neutral")+
-    card("Tercapai<br>threshold",indTercapai,"indikator, dari "+nInd,"teal")+
+    card("Di atas<br>threshold",indAtas,"indikator, dari "+nInd,"teal")+
+    card("Di bawah<br>threshold",uniq(rows.filter(r=>r._thr_status==="Di bawah threshold")
+      .map(r=>r.Indicator)).length,"indikator","critical")+
     card("Sesuai Target<br>/ Threshold",cnt("_status","Sesuai Target/Threshold"),indSesuai+" indikator","ready")+
-    card("Ditinjau",cnt("_status","Ditinjau"),"","review")+
-    card("Perhatian",cnt("_status","Perhatian"),"","critical")+
+    card("Ditinjau",cnt("_status","Ditinjau"),indTinjau+" indikator","review")+
+    card("Perhatian",cnt("_status","Perhatian"),indHati+" indikator","critical")+
     card("Capai<br>target",cnt("_tgt_status","Capai target"),indTarget+" indikator","accent")+
   '</div>'+
   '<div class="legendrow"><span class="lbl">Legend</span>'+
@@ -571,12 +579,26 @@ function renderAnalisis(){
       (CFG.target_delta*100).toFixed(0)+'pp</b></span></div>'+
 
   '<div class="grid2" style="margin-top:22px">'+
-    '<div><div class="slabel" style="margin-top:0">Status indikator per Area Program</div>'+
-      '<div class="chartbox">'+chartStack(g5,SER_IND,{pct100:true,labW:138})+legend(SER_IND)+'</div></div>'+
+    '<div><div class="slabel" style="margin-top:0">Status indikator per Outcome '+
+      '<span class="hint">jumlah indikator</span></div>'+
+      '<div class="chartbox">'+chartStack(gOcStat,SER_IND,{pct100:true,labelCount:true,labW:70,bh:20,gap:11})+
+        legend(SER_IND)+'</div></div>'+
+    '<div><div class="slabel" style="margin-top:0">Endline vs Threshold per Outcome '+
+      '<span class="hint">jumlah indikator</span></div>'+
+      '<div class="chartbox">'+chartStack(gOcThr,SER_THR,{pct100:true,labelCount:true,labW:70,bh:20,gap:11})+
+        legend(SER_THR)+'</div></div>'+
+  '</div>'+
+
+  '<div class="grid2" style="margin-top:20px">'+
+    '<div><div class="slabel" style="margin-top:0">Status indikator per Area Program '+
+      '<span class="hint">jumlah indikator</span></div>'+
+      '<div class="chartbox">'+chartStack(g5,SER_IND,{pct100:true,labelCount:true,labW:138})+
+        legend(SER_IND)+'</div></div>'+
     '<div><div class="slabel" style="margin-top:0">Endline vs Threshold per Area Program '+
-      '<span class="hint">jumlah baris</span></div>'+
+      '<span class="hint">jumlah indikator</span></div>'+
       '<div class="chartbox">'+chartStack(g6,SER_THR,{pct100:true,labelCount:true,labW:138})+legend(SER_THR)+
-      '<p class="chartnote">Urutan baris sama dengan grafik di sebelah kiri, jadi kedua grafik bisa dibaca berpasangan.</p></div></div>'+
+      '<p class="chartnote">Urutan baris sama dengan grafik di sebelah kiri, jadi kedua grafik bisa dibaca berpasangan. '+
+      'Panjang bar tetap proporsional supaya antar-AP bisa dibandingkan; angka di dalam segmen adalah jumlah indikator.</p></div></div>'+
   '</div>'+
 
   '<div class="grid2" style="margin-top:20px">'+
