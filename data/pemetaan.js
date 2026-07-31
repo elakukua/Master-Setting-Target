@@ -1,8 +1,7 @@
 /* ==========================================================================
    tblPemetaan  —  data/pemetaan.js   (26 indikator × 17 AP)
    --------------------------------------------------------------------------
-   Matriks Yes/No: apakah indikator berlaku untuk AP tersebut.
-   Kombinasi yang tidak ada di sini dianggap Yes.
+   Matriks Yes/No. Kombinasi yang tidak ada dianggap Yes.
    ========================================================================== */
 window.WVI_PEMETAAN = {
   aps: ["Bengkayang", "Kubu Raya", "Landak", "Ende", "NADA", "Manggarai", "Manggarai Timur", "Belu", "Malaka", "SBD", "TTS", "Biak", "Sentani-Sarmi", "Simokerto", "Nias Selatan", "Lombok", "Jakarta Utara"],
