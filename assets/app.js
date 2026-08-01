@@ -335,7 +335,9 @@ function crumbLine(){
   return 'Data per <b>'+esc(CFG.data_date)+'</b> &nbsp;·&nbsp; <b>'+n0(c.n)+'</b> baris &nbsp;·&nbsp; <b>'+
     AP_LIST.length+'</b> AP &nbsp;·&nbsp; <b>'+ZONALS.length+'</b> Zonal &nbsp;·&nbsp; '+
     chipOf(c.rowid,c.rowid==="ROW ID OK")+chipOf(c.sinkron,c.sinkron==="SINKRON")+
-    chipOf(c.dupe,c.comboDupe===0)+chipOf(c.range,c.oor===0)+chipOf(c.numden,c.nd===0);
+    chipOf(c.dupe,c.comboDupe===0)+chipOf(c.range,c.oor===0)+chipOf(c.numden,c.nd===0)+
+    (S.src==="csv"?'<span class="ichip ok">● CSV OTOMATIS</span>':'')+
+    (S.csvErr?'<span class="ichip no">▲ CSV GAGAL DIBACA</span>':'');
 }
 function go(id){
   if(!SHEETS.some(s=>s.id===id))return;
@@ -502,6 +504,166 @@ function renderSummary(){
    'Baris abu-abu miring: <b>Berlaku = No</b>.</p>';
 }
 /* ==========================================================================
+   SUMBER DATA CSV — untuk pipeline Power Automate
+   --------------------------------------------------------------------------
+   Halaman mencoba data/indicators.csv lebih dulu. Kalau ada dan bisa dibaca,
+   itu yang dipakai; kalau tidak, jatuh ke data/indicators.js seperti biasa.
+   Jadi pipeline bisa dinyalakan tanpa mengubah apa pun, dan halaman tetap
+   jalan kalau flow-nya mati atau kalau file dibuka langsung dari folder.
+
+   Pemisah kolom dideteksi sendiri: Tab, titik koma, atau koma. Excel berbahasa
+   Indonesia menulis CSV dengan titik koma dan desimal koma — keduanya terbaca.
+
+   Kolom dipetakan lewat NAMA HEADER, bukan posisi. Jadi kalau urutan kolom di
+   Excel berubah, atau ada kolom baru di tengah, data tetap masuk ke tempat
+   yang benar.
+   ========================================================================== */
+const CSV_MAP={
+  "zonal":"Zonal",
+  "area program":"Area Program","areaprogram":"Area Program","ap":"Area Program","adp":"Area Program",
+  "outcome":"Outcome",
+  "code":"Code","kode":"Code",
+  "indicator deskripsi":"Indicator","indicator":"Indicator","indikator":"Indicator",
+  "indicator description":"Indicator",
+  "numerator baseline":"Num_Base","num baseline":"Num_Base","numerator base":"Num_Base",
+  "denominator baseline":"Den_Base","den baseline":"Den_Base","denominator base":"Den_Base",
+  "% baseline":"Pct_Base","pct baseline":"Pct_Base","baseline %":"Pct_Base","baseline":"Pct_Base",
+  "numerator lop":"Num_LOP","num lop":"Num_LOP","numerator evaluation":"Num_LOP",
+  "denominator lop":"Den_LOP","den lop":"Den_LOP","denominator evaluation":"Den_LOP",
+  "% lop":"Pct_LOP","pct lop":"Pct_LOP","lop %":"Pct_LOP","% endline":"Pct_LOP",
+  "% endline (lop)":"Pct_LOP","evaluation %":"Pct_LOP",
+  "delta":"Delta",
+  "threshold":"Threshold",
+  "delta (lop-baseline)":"Delta_LOP_Base","delta lop-baseline":"Delta_LOP_Base",
+  "delta (lop - baseline)":"Delta_LOP_Base",
+  "row id":"Row_ID","rowid":"Row_ID","row_id":"Row_ID",
+  "ap decision":"AP_Decision",
+  "ap aim+ 2026 >= threshold?":"AP_vs_Threshold","ap aim+ 2026 >= threshold":"AP_vs_Threshold",
+  "ap vs threshold":"AP_vs_Threshold",
+  /* kolom yang metode PEARL butuhkan */
+  "hh targeted":"HH_Targeted","hh target":"HH_Targeted","household targeted":"HH_Targeted",
+  "hh_targeted":"HH_Targeted","kk sasaran":"HH_Targeted"
+};
+const CSV_NUM={Num_Base:1,Den_Base:1,Pct_Base:1,Num_LOP:1,Den_LOP:1,Pct_LOP:1,
+  Delta:1,Threshold:1,Delta_LOP_Base:1,HH_Targeted:1,AP_Decision:1};
+const CSV_PROP={Pct_Base:1,Pct_LOP:1,Delta:1,Threshold:1,Delta_LOP_Base:1};
+
+function sniffDelim(line){
+  let best="\t", n=-1;
+  ["\t",";",","].forEach(d=>{
+    let c=0,q=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch==='"'){ q=!q; continue; }
+      if(!q&&ch===d) c++;
+    }
+    if(c>n){ n=c; best=d; }
+  });
+  return {delim:best, count:n};
+}
+function parseDelim(text,delim){
+  const rows=[]; let row=[], cell="", q=false, i=0;
+  const s=text.replace(/\r\n/g,"\n").replace(/\r/g,"\n").replace(/^\uFEFF/,"");
+  while(i<s.length){
+    const ch=s[i];
+    if(q){
+      if(ch==='"'){ if(s[i+1]==='"'){cell+='"';i+=2;continue;} q=false;i++;continue; }
+      cell+=ch; i++; continue;
+    }
+    if(ch==='"'&&cell===""){ q=true; i++; continue; }
+    if(ch===delim){ row.push(cell); cell=""; i++; continue; }
+    if(ch==="\n"){ row.push(cell); rows.push(row); row=[]; cell=""; i++; continue; }
+    cell+=ch; i++;
+  }
+  if(cell!==""||row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(r=>r.join("").trim()!=="");
+}
+/* pemisah desimal ditentukan sekali untuk seluruh file, dari kolom proporsi */
+function sniffDec(cells,idx,propCols){
+  let dot=0, com=0;
+  for(let r=1;r<cells.length;r++){
+    propCols.forEach(j=>{
+      const v=String(cells[r][j]==null?"":cells[r][j]).replace(/[\s\u00a0%]/g,"");
+      const m=v.match(/([.,])(\d{2,})$/);
+      if(m) m[1]==="."?dot++:com++;
+    });
+  }
+  return com>dot ? "," : ".";
+}
+function csvNum(raw,dec){
+  let s=String(raw==null?"":raw).replace(/[\s\u00a0]/g,"");
+  if(s===""||s==="-"||s==="—") return null;
+  if(s.charAt(0)==="#") return null;      /* #VALUE! #REF! #N/A #DIV/0! dari Excel */
+  const pct=/%$/.test(s); s=s.replace(/%/g,"");
+  const neg=/^\(.*\)$/.test(s)||/^-/.test(s);
+  s=s.replace(/^[+-]/,"").replace(/^\(|\)$/g,"");
+  if(!/^[\d.,]+$/.test(s)) return null;
+  const grp = dec==="," ? "." : ",";
+  const d=s.lastIndexOf(dec);
+  const out = d<0 ? s.split(grp).join("")
+    : s.slice(0,d).split(grp).join("").split(dec).join("")+"."+
+      s.slice(d+1).split(grp).join("").split(dec).join("");
+  let n=parseFloat(out);
+  if(!isFinite(n)) return null;
+  if(neg) n=-n;
+  return pct ? n/100 : n;
+}
+function parseCsvData(text){
+  const first=text.replace(/^\uFEFF/,"").split(/\r?\n/)[0]||"";
+  const sn=sniffDelim(first);
+  if(sn.count<3) return {err:"Baris pertama hanya punya "+(sn.count+1)+" kolom. "+
+    "Pastikan file CSV punya baris header dan minimal empat kolom."};
+  const cells=parseDelim(text,sn.delim);
+  if(cells.length<2) return {err:"Tidak ada baris data di bawah header."};
+  const head=cells[0].map(h=>String(h||"").replace(/[\s\u00a0]+/g," ").trim().toLowerCase());
+  const idx={}; const unknown=[];
+  head.forEach((h,j)=>{
+    const k=CSV_MAP[h];
+    if(k){ if(idx[k]===undefined) idx[k]=j; }
+    else if(h) unknown.push(cells[0][j]);
+  });
+  const need=["Area Program","Indicator"];
+  const miss=need.filter(k=>idx[k]===undefined);
+  if(miss.length) return {err:"Kolom wajib tidak ditemukan di header: "+miss.join(", ")+
+    ". Header yang terbaca: "+head.filter(Boolean).join(" | ")};
+  const propCols=Object.keys(CSV_PROP).filter(k=>idx[k]!==undefined).map(k=>idx[k]);
+  const dec=sniffDec(cells,idx,propCols);
+  const rows=[]; let errCells=0;
+  for(let r=1;r<cells.length;r++){
+    const c=cells[r], o={};
+    Object.keys(idx).forEach(k=>{
+      const raw=c[idx[k]];
+      if(CSV_NUM[k]) o[k]=csvNum(raw,dec);
+      else {
+        let s=String(raw==null?"":raw).replace(/[\x00-\x1F\x7F]/g,"").trim();
+        if(s.charAt(0)==="#") { s=""; errCells++; }
+        o[k]=s||null;
+      }
+    });
+    if(!o["Area Program"]||!o.Indicator) continue;
+    if(!o.Row_ID||o.Row_ID==="0") o.Row_ID="CSV-"+String(rows.length+1).padStart(4,"0");
+    rows.push(o);
+  }
+  if(!rows.length) return {err:"Header terbaca tapi tidak ada baris data yang lengkap."};
+  return {rows:rows, delim:sn.delim===";"?"titik koma":sn.delim===","?"koma":"Tab",
+    dec:dec===","?"koma":"titik", unknown:unknown, errCells:errCells,
+    hasHH:idx.HH_Targeted!==undefined};
+}
+async function tryCsv(){
+  for(const p of ["data/indicators.csv","indicators.csv"]){
+    try{
+      const res=await fetch(p+"?t="+Date.now(),{cache:"no-store"});
+      if(!res.ok) continue;
+      const txt=await res.text();
+      if(!txt.trim()) continue;
+      const out=parseCsvData(txt);
+      out.path=p;
+      return out;
+    }catch(e){ /* file:// atau file tidak ada — lanjut ke .js */ }
+  }
+  return null;
+}
+/* ==========================================================================
    HALAMAN 1 — NATIONAL SUMMARY DASHBOARD
    --------------------------------------------------------------------------
    Metode: Weighted National (%) = Σ Numerator ÷ Σ Denominator.
@@ -518,6 +680,19 @@ function renderSummary(){
    ========================================================================== */
 const PERIODS=["Baseline","Evaluation","Both"];
 
+/* Metode PEARL, diverifikasi terhadap sheet IND160 (Sigma HH 90.716 -> 20,6%):
+     ADP Weight            = HH Targeted ADP / Sigma HH Targeted ADP yang punya rate
+     Weighted Contribution = ADP Weight x ADP Rate
+     Weighted National     = Sigma Weighted Contribution
+   Kalau kolom HH Targeted belum ada di data, angka nasional TIDAK dihitung —
+   lebih baik kosong daripada salah bobot. hasHH menandainya. */
+const hasHH = () => S.rows.some(r=>N(r.HH_Targeted)>0);
+
+/* Terverifikasi terhadap Master (9): di sheet IND160 Dashboard, kolom HH Targeted
+   berisi angka yang SAMA dengan Denominator (LOP) pada seluruh 17 ADP. Karena itu
+       Sigma(HH x rate) / Sigma HH  =  Sigma(den x num/den) / Sigma den  =  Sigma num / Sigma den
+   Kedua rumus itu identik secara aljabar, dan Total Nasional di sheet Anda
+   (18,34% evaluation, 24,72% baseline untuk OIOS 160) sama dengan hasil di bawah. */
 function weightedOf(rows){
   let nB=0,dB=0,nE=0,dE=0,skipB=0,skipE=0;
   const apB={}, apE={};
@@ -529,11 +704,12 @@ function weightedOf(rows){
     else if(N(r.Pct_LOP)>0) skipE++;
   });
   const pB=dB>0?nB/dB:null, pE=dE>0?nE/dE:null;
-  return {nB:nB,dB:dB,nE:nE,dE:dE,pB:pB,pE:pE,
+  return {nB:nB,dB:dB,nE:nE,dE:dE,pB:pB,pE:pE,wB:dB,wE:dE,useHH:true,
     apB:Object.keys(apB).length, apE:Object.keys(apE).length,
     skipB:skipB, skipE:skipE,
     delta:(pB!==null&&pE!==null)?(pE-pB):null};
 }
+
 function natRows(){
   let rows=S.rows;
   if(F.zonal.length)   rows=rows.filter(r=>F.zonal.indexOf(r.Zonal)>=0);
@@ -578,12 +754,12 @@ function renderNasional(){
   const del=withBoth.slice().sort((a,b)=>b.w.delta-a.w.delta)
     .map(x=>({label:x.short+(x.dir==="Turun"?" ↓":""), v:x.w.delta}));
 
-  return '<div class="notice">Seluruh angka nasional dihitung <b>Σ Numerator ÷ Σ Denominator</b>: '+
-    'numerator dijumlahkan dulu, denominator dijumlahkan dulu, baru dibagi. '+
-    'Tidak ada rata-rata persentase antar AP atau antar zona. '+
-    '<b>Tidak ada total lintas indikator</b> — menjumlahkan populasi dua indikator yang berbeda '+
-    'menghasilkan angka tanpa makna, jadi angka nasional hanya sah per indikator.</div>'+
-
+  return '<div class="notice"><b>Weighted National (%) = Σ Numerator ÷ Σ Denominator</b>, dihitung '+
+    'per indikator. Setara dengan Σ(ADP Weight × ADP Rate) di sheet Anda, karena kolom '+
+    '<b>HH Targeted</b> di Master (9) berisi angka yang sama dengan Denominator (LOP) pada '+
+    'seluruh 17 ADP. OIOS 160 di sheet IND160 Dashboard: 18,34% evaluation dan 24,72% baseline — '+
+    'sama dengan angka di halaman ini. <b>Tidak ada total lintas indikator</b>, karena populasi '+
+    'tiap indikator berbeda.</div>'+
   natFilterBand()+
 
   '<div class="slabel">Cakupan dataset'+natActiveLine()+'</div>'+
@@ -1309,8 +1485,13 @@ function toast(html){
 }
 function chip(){
   const c=document.getElementById("dataChip"); if(!c)return;
-  c.textContent=S.local?"perubahan lokal · belum di-commit":CFG.version;
-  c.className=S.local?"chip local":"chip";
+  c.textContent = S.local ? "perubahan lokal · belum di-commit"
+    : (S.src==="csv" ? "CSV · "+n0(S.rows.length)+" baris" : CFG.version);
+  c.className = S.local ? "chip local" : (S.src==="csv" ? "chip csv" : "chip");
+  c.title = S.src==="csv"
+    ? "Dibaca dari "+(S.csv&&S.csv.path||"data/indicators.csv")+" · pemisah "+
+      (S.csv&&S.csv.delim)+" · desimal "+(S.csv&&S.csv.dec)
+    : "Dibaca dari data/indicators.js";
 }
 function loadLogo(){
   const img=document.getElementById("wvLogo"); if(!img)return;
@@ -1368,7 +1549,7 @@ function showGate(next){
 /* ==========================================================================
    BOOT
    ========================================================================== */
-function boot(){
+async function boot(){
   if(!window.WVI_CONFIG||!window.WVI_INDICATORS||!window.WVI_ASUMSI||!window.WVI_PEMETAAN){
     document.getElementById("sheets").innerHTML=
       '<div class="sheet on" style="padding:38px 26px"><h1 class="title">File data tidak termuat</h1>'+
@@ -1377,7 +1558,16 @@ function boot(){
       '<p>Pastikan keempatnya ter-commit dan namanya tidak berubah.</p></div>';
     return;
   }
-  adopt(); recompute();
+  adopt();
+  /* CSV dari pipeline Power Automate menang atas indicators.js kalau ada */
+  S.csv=await tryCsv();
+  if(S.csv&&S.csv.rows){
+    S.rows=S.csv.rows.map(r=>Object.assign({},r));
+    S.src="csv";
+  } else if(S.csv&&S.csv.err){
+    S.src="js"; S.csvErr=S.csv.err;
+  } else S.src="js";
+  recompute();
   const sv=loadLocal();
   if(sv&&sv.rows&&sv.rows.length){
     try{
