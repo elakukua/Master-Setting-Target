@@ -1,5 +1,5 @@
 /* =============================================================================
-   assets/a11y-patch.css  ·  v1.1
+   assets/a11y-patch.css  ·  v1.3
    AIM+ AP Target Setting — Decision Workbook
    -----------------------------------------------------------------------------
    File terpisah, dimuat SETELAH assets/app.css di index.html. Tidak ada satu
@@ -294,12 +294,42 @@ body.modal-open{ overflow: hidden; }
 
 
 /* -----------------------------------------------------------------------------
+   11.6b · PANEL KEGAGALAN BOOT  (v1.2)
+   -----------------------------------------------------------------------------
+   Muncul kalau setelah 4 detik #sheets masih kosong. Lebih baik halaman
+   mengaku gagal daripada diam putih.
+----------------------------------------------------------------------------- */
+.bootfail{
+  margin: 20px 22px;
+  padding: 14px 16px;
+  border-left: 4px solid var(--red, #C0392B);
+  background: #FDF3F2;
+  font-size: var(--fs-small);
+  line-height: 1.5;
+  color: #4A2320;
+  max-width: 720px;
+}
+.bootfail b{ display: block; margin-bottom: 6px; font-size: 13px; }
+.bootfail p{ margin: 6px 0 0; }
+.bootfail code{
+  display: inline-block;
+  margin: 2px 3px 2px 0;
+  padding: 1px 5px;
+  background: #fff;
+  border: 1px solid #E3C9C6;
+  border-radius: 3px;
+  font-size: var(--fs-micro);
+}
+
+
+/* -----------------------------------------------------------------------------
    11.7 · CETAK — tambahan untuk §9
 ----------------------------------------------------------------------------- */
 @media print{
   [data-tip]::after,
   [data-tip]::before,
   .skel-wrap,
+  .bootfail,
   .skiplink{ display: none !important; }
 
   /* Warna teks dicetak selalu penuh, jangan andalkan abu-abu layar */
