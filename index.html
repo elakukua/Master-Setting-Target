@@ -3,70 +3,181 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>National Target Dashboard · Wahana Visi Indonesia</title>
-<meta name="description" content="National Target Dashboard — Indonesia National Summary. AIM+ Target Setting FY27–FY30, Wahana Visi Indonesia.">
+<title>AIM+ AP Target Setting — Decision Workbook · FY27–30 · PEARL WVI</title>
+<meta name="description" content="Area Programme target setting decision workbook for the AIM+ cycle FY27–FY30. PEARL, Wahana Visi Indonesia.">
 <meta name="color-scheme" content="light">
-<link rel="stylesheet" href="assets/app.css"
-      onerror="var l=document.createElement('link');l.rel='stylesheet';l.href='app.css';document.head.appendChild(l);">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23FF5515'/%3E%3Crect x='7' y='19' width='4' height='7' rx='1' fill='white'/%3E%3Crect x='14' y='13' width='4' height='13' rx='1' fill='white'/%3E%3Crect x='21' y='7' width='4' height='19' rx='1' fill='white'/%3E%3C/svg%3E">
+
+<!-- ============================================================
+     LAYOUT: assets/ untuk styling dan engine, data/ untuk data.
+     Versi sebelumnya memakai path flat (href="app.css") sehingga
+     tidak ada satu pun asset yang termuat di GitHub Pages.
+     ============================================================ -->
+<link rel="stylesheet" href="assets/app.css">
+<link rel="stylesheet" href="assets/a11y-patch.css">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23111222'/%3E%3Crect x='5' y='22' width='5' height='5' fill='%23FF5515'/%3E%3Crect x='13' y='15' width='5' height='12' fill='%23FF5515'/%3E%3Crect x='21' y='7' width='5' height='20' fill='%23155930'/%3E%3C/svg%3E">
 </head>
 <body>
 
-<div id="app"><div style="padding:40px 28px;font:14px/1.6 system-ui;color:#565D6D">Memuat dashboard…</div></div>
+<a class="skiplink" href="#sheets">Lompat ke isi lembar</a>
 
+<!-- ========================= WORKBOOK CHROME ========================= -->
+<div class="chrome noprint" role="banner" aria-label="Kepala workbook">
+  <div class="chrome-in">
+    <div class="filename">
+      <b>WVI_AIMplus_TargetSetting_Decision_Workbook_FY27-30</b><span class="ext">&nbsp;· static site</span>
+    </div>
+
+    <span class="chip" id="dataChip" role="status" aria-live="polite">loading…</span>
+
+    <div class="chrome-sp"></div>
+
+    <span class="lockstate">🔒 Reports read-only · sheets 00 and 06 accept input</span>
+
+    <button class="cbtn" id="btnMaster"  data-tip-pos="below"
+            data-tip="Ubah data, register AP, dan peta outcome">✎ Master setup</button>
+
+    <button class="cbtn" id="btnRefresh" data-tip-pos="below"
+            data-tip="Hitung ulang seluruh kolom turunan, chart, dan kartu">↻ Rebuild</button>
+
+    <button class="cbtn" id="btnImport"  data-tip-pos="below"
+            data-tip="Tempel blok submission dari Excel">⤓ Import submissions</button>
+
+    <button class="cbtn" id="btnExport"  data-tip-pos="below"
+            data-tip="Unduh log keputusan, daftar koreksi, atau tblMaster">⤒ Export</button>
+
+    <button class="cbtn" id="btnPrint"   data-tip-pos="below"
+            data-tip="Cetak lembar yang sedang terbuka, A4 landscape">⎙ Print</button>
+  </div>
+</div>
+
+<!-- ========================= SHEETS ========================= -->
+<!-- Skeleton di bawah ini tampil pada paint pertama, sebelum app.js jalan.
+     boot() menimpanya lewat sheets.innerHTML — tidak ada state yang perlu diurus. -->
+<div class="sheetwrap" id="sheets" tabindex="-1">
+  <div class="skel-wrap" aria-hidden="true">
+    <div class="skel skel-title"></div>
+    <div class="skel skel-sub"></div>
+    <div class="skel-cards">
+      <div class="skel skel-card"></div>
+      <div class="skel skel-card"></div>
+      <div class="skel skel-card"></div>
+      <div class="skel skel-card"></div>
+    </div>
+    <div class="skel skel-row"></div>
+    <div class="skel skel-row"></div>
+    <div class="skel skel-row"></div>
+    <div class="skel skel-row"></div>
+    <div class="skel skel-row"></div>
+    <div class="skel skel-row"></div>
+    <div class="skel skel-row"></div>
+    <div class="skel skel-row"></div>
+    <p class="skel-cap">Memuat tblMaster, register AP, dan log keputusan…</p>
+  </div>
+</div>
+
+<!-- ========================= SHEET TABS ========================= -->
+<div class="tabbar noprint" role="navigation" aria-label="Lembar workbook">
+  <div class="tabbar-in" id="tabbar"></div>
+</div>
+
+<!-- ========================= MODALS ========================= -->
 <div class="scrim" id="scrimImport">
   <div class="modal">
-    <h3>Impor data dari Excel <button data-close>✕</button></h3>
+    <h3 id="scrimImport_title">Import submissions
+      <button data-close aria-label="Tutup dialog impor">✕</button>
+    </h3>
     <div class="body">
-      <p>Di sheet <b>Indicators</b>, pilih seluruh blok data (boleh ikut baris header), copy, lalu tempel di bawah.</p>
-      <p class="dim" style="font-size:12px">Angka boleh berkoma maupun bertitik. Sel kosong tetap kosong.
-         Nilai <b>0</b> pada % Baseline atau % LOP tetap berarti belum ada data.</p>
-      <textarea id="impBox" placeholder="Tempel di sini…" spellcheck="false"></textarea>
-      <div id="impReport"></div>
+      <p>Select the submission block in Excel (<b>without</b> the header row), copy, and paste below.
+      Tab-separated, 16 columns, in this order — the same order as <span class="keyprev">tblMaster</span> §2.1:</p>
+
+      <div class="colspec">Zonal ⇥ AP ⇥ AP_ID ⇥ Outcome ⇥ Code ⇥ Indicator ⇥ Num_Base ⇥ Den_Base ⇥ Pct_Base ⇥ Num_LOP ⇥ Den_LOP ⇥ Pct_LOP ⇥ Delta ⇥ AP_Proposal ⇥ Threshold ⇥ AP_vs_Threshold</div>
+
+      <p class="dim">Proportions may be written as <span class="keyprev">0.235</span> or <span class="keyprev">23.5%</span> — both are read as 23.5%.
+      An empty cell stays empty; it is never read as zero. Text is trimmed and cleaned.
+      An AP that is not yet on the register is added to it automatically with all five outcomes on.</p>
+
+      <label class="srlabel" for="pasteBox">Blok data submission</label>
+      <textarea id="pasteBox" placeholder="Paste here…" spellcheck="false"
+                aria-describedby="pasteMsg"></textarea>
+      <p id="pasteMsg" class="vmsg" role="alert" style="display:none"></p>
     </div>
     <div class="foot">
-      <button class="tbtn" id="impCheck">Periksa</button>
-      <button class="tbtn pri" id="impGo" disabled>Muat data</button>
-      <button class="tbtn" data-close>Batal</button>
+      <button class="gobtn" id="btnDoImport">Load into tblMaster</button>
+      <button class="ghost" data-close>Cancel</button>
+      <span class="appendonly">Import replaces the data and clears the decision log. Export the log first if you need it.</span>
     </div>
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="scrim" id="scrimExport">
+  <div class="modal">
+    <h3 id="scrimExport_title">Export
+      <button data-close aria-label="Tutup dialog ekspor">✕</button>
+    </h3>
+    <div class="body">
+      <p>CSV opens directly in Excel. To change what this site <i>publishes</i>, use
+      <b>Master setup → Save &amp; publish</b> instead: those downloads are the data files themselves.</p>
 
-<script>
-(function(){
-  var Q=[["data/config.js","config.js"],["data/indicators.js","indicators.js"],
-         ["data/asumsi.js","asumsi.js"],["data/pemetaan.js","pemetaan.js"],
-         ["assets/app.js","app.js"]];
-  var found=[],failed=[];
-  function one(c,done){var i=0;(function t(){
-    if(i>=c.length){done(false);return;}
-    var s=document.createElement("script");s.src=c[i++];s.async=false;
-    s.onload=function(){found.push(s.src);done(true);};
-    s.onerror=function(){s.parentNode&&s.parentNode.removeChild(s);t();};
-    document.head.appendChild(s);})();}
-  function next(n){ if(n>=Q.length){fin();return;}
-    one(Q[n],function(ok){ if(!ok) failed.push(Q[n][0].replace(/^.*\//,"")); next(n+1); }); }
-  function fin(){
-    if(failed.length) return rep();
-    if(typeof boot!=="function") return rep("app.js termuat tapi tidak mendefinisikan boot()");
-    if(document.readyState==="loading") return;
-    try{ boot(); }catch(e){ rep(e.message); }
-  }
-  function rep(x){
-    document.getElementById("app").innerHTML=
-      '<div style="padding:40px 28px;max-width:660px;font:14px/1.7 system-ui;color:#565D6D">'+
-      '<h2 style="font-size:18px;color:#14161A;margin:0 0 12px">Ada berkas yang tidak ditemukan</h2>'+
-      '<p>Dicari di <code>data/</code> dan <code>assets/</code> lebih dulu, lalu di root. '+
-      'Yang tidak ada di keduanya:</p><ul>'+failed.map(function(f){
-        return '<li style="color:#C62828;font-weight:500">'+f+'</li>';}).join('')+'</ul>'+
-      (found.length?'<p>Berhasil dimuat:</p><ul>'+found.map(function(f){
-        return '<li><code>'+f+'</code></li>';}).join('')+'</ul>':'')+
-      (x?'<p style="color:#C62828">'+x+'</p>':'')+'</div>';
-  }
-  next(0);
-})();
-</script>
+      <div class="fgrid">
+        <div class="fg"><button class="ghost" id="expDec" style="width:100%"
+              aria-describedby="hlpDec">Decision log (CSV)</button>
+          <div class="hlp" id="hlpDec">All revisions, in append order</div></div>
+
+        <div class="fg"><button class="ghost" id="expCorr" style="width:100%"
+              aria-describedby="hlpCorr">Correction list (CSV)</button>
+          <div class="hlp" id="hlpCorr">Every flagged row, for the APs to fix</div></div>
+
+        <div class="fg"><button class="ghost" id="expMaster" style="width:100%"
+              aria-describedby="hlpMaster">tblMaster (CSV)</button>
+          <div class="hlp" id="hlpMaster">All 40 columns, derived fields included</div></div>
+
+        <div class="fg"><button class="ghost" id="expJson" style="width:100%"
+              aria-describedby="hlpJson">Workbook state (JSON)</button>
+          <div class="hlp" id="hlpJson">Data plus decisions, one file</div></div>
+      </div>
+    </div>
+    <div class="foot"><button class="ghost" data-close>Close</button>
+      <span class="appendonly">Files download to your machine. Nothing is sent anywhere.</span></div>
+  </div>
+</div>
+
+<div class="scrim" id="scrimLocked">
+  <div class="modal" style="max-width:520px">
+    <h3 id="scrimLocked_title">Sheet is hidden
+      <button data-close aria-label="Tutup pemberitahuan">✕</button>
+    </h3>
+    <div class="body">
+      <p><span id="lockedName" class="keyprev"></span> is a data sheet, hidden in the Excel build and held in
+      the data files next to this page.</p>
+      <p class="dim">Everything on it is already rendered on sheets 01–08. To change it, use
+      <b>00_MASTER</b> — that is the same content with guard rails, and it can write the file back out for you.</p>
+    </div>
+    <div class="foot">
+      <button class="ghost" data-close>Understood</button>
+      <button class="gobtn" onclick="document.getElementById('scrimLocked').classList.remove('on');go('00_MASTER')">Open Master setup</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- ========================= DATA (harus dimuat sebelum app.js) =========================
+     Tujuh file, sesuai isi folder data/. Semuanya hanya menetapkan window.WVI_*,
+     jadi urutan antar-file tidak kritis — kecuali app.js membaca config saat parse.
+     config.js diletakkan pertama untuk berjaga-jaga.
+     ====================================================================================== -->
+<script src="data/config.js"></script>
+<script src="data/ap-register.js"></script>
+<script src="data/indicators.js"></script>
+<script src="data/pemetaan.js"></script>
+<script src="data/asumsi.js"></script>
+<script src="data/master.js"></script>
+<script src="data/decisions.js"></script>
+
+<!-- ========================= APP ========================= -->
+<script src="assets/app.js"></script>
+<script src="assets/a11y-patch.js"></script>
+
 </body>
 </html>
