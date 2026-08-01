@@ -299,62 +299,6 @@ function chartDiverge(items,opt){
 const F={ zonal:[], ap:[], outcome:[], status:[], ind:[], berlaku:"Yes", period:"Both",
   sort:null, sortDir:1, showAll:false, fbOpen:true };
 
-const SHEETS=[
- {id:"NASIONAL", tab:"NATIONAL SUMMARY", c:"#FF5515",
-  title:"NATIONAL SUMMARY DASHBOARD", render:renderNasional},
- {id:"SUMMARY", tab:"SUMMARY", c:"#0C7993",
-  title:"SUMMARY — SEMUA INDIKATOR", render:renderSummary},
- {id:"ANALISIS", tab:"ANALISIS AP", c:"#111222",
-  title:"ANALISIS AP — BASELINE vs ENDLINE (LOP)", render:renderAnalisis},
- {id:"ASUMSI", tab:"Asumsi Indikator", c:"#3F3D4C", cfg:true,
-  title:"ASUMSI INDIKATOR", render:renderAsumsi},
- {id:"PEMETAAN", tab:"Pemetaan Indikator", c:"#3F3D4C", cfg:true,
-  title:"PEMETAAN INDIKATOR", render:renderPemetaan}
-];
-let CUR="NASIONAL";
-
-function buildFrames(){
-  document.getElementById("sheets").innerHTML=SHEETS.map(sh=>
-   '<section class="sheet" id="sh_'+sh.id+'">'+
-    '<div class="hdr"><div class="hdr-top">'+
-      '<h1 class="title">'+esc(sh.title)+'</h1>'+
-      (sh.cfg?'<span class="cfgflag">SHEET KONFIGURASI — diisi oleh PEARL</span>':'')+
-      '<div class="hdr-right"><div class="stagebar" data-ver>'+esc(CFG.version)+'</div></div>'+
-    '</div><div class="crumb" data-crumb></div></div>'+
-    '<div class="rule4"></div>'+
-    '<div class="pad" data-body></div>'+
-    '<div class="ftr"><div class="ftr-l">Draft — tidak untuk sirkulasi eksternal</div></div>'+
-   '</section>').join('');
-  document.getElementById("tabbar").innerHTML=SHEETS.map(sh=>
-    '<button class="tab" data-tab="'+sh.id+'"><span class="dot" style="background:'+sh.c+'"></span>'+
-    esc(sh.tab)+'</button>').join('');
-}
-function crumbLine(){
-  const c=checks();
-  const chipOf=(txt,ok)=>'<span class="ichip '+(ok?"ok":"no")+'">'+(ok?"● ":"▲ ")+esc(txt)+'</span>';
-  return 'Data per <b>'+esc(CFG.data_date)+'</b> &nbsp;·&nbsp; <b>'+n0(c.n)+'</b> baris &nbsp;·&nbsp; <b>'+
-    AP_LIST.length+'</b> AP &nbsp;·&nbsp; <b>'+ZONALS.length+'</b> Zonal &nbsp;·&nbsp; '+
-    chipOf(c.rowid,c.rowid==="ROW ID OK")+chipOf(c.sinkron,c.sinkron==="SINKRON")+
-    chipOf(c.dupe,c.comboDupe===0)+chipOf(c.range,c.oor===0)+chipOf(c.numden,c.nd===0)+
-    (S.src==="csv"?'<span class="ichip ok">● CSV OTOMATIS</span>':'')+
-    (S.csvErr?'<span class="ichip no">▲ CSV GAGAL DIBACA</span>':'');
-}
-function go(id){
-  if(!SHEETS.some(s=>s.id===id))return;
-  CUR=id;
-  SHEETS.forEach(s=>document.getElementById("sh_"+s.id).classList.toggle("on",s.id===id));
-  document.querySelectorAll(".tab[data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===id));
-  paint(id); window.scrollTo({top:0,behavior:"instant"});
-}
-function paint(id){
-  const sh=SHEETS.find(s=>s.id===id); if(!sh)return;
-  const el=document.getElementById("sh_"+id);
-  el.querySelector("[data-crumb]").innerHTML=crumbLine();
-  el.querySelector("[data-ver]").textContent=CFG.version;
-  el.querySelector("[data-body]").innerHTML=sh.render();
-  wire(id,el);
-}
-function repaint(){ paint(CUR); }
 function card(lab,val,sub,cls){
   return '<div class="card '+(cls||"neutral")+'"><div class="lab">'+lab+'</div>'+
     '<div><div class="val">'+val+'</div><div class="sub">'+(sub||"&nbsp;")+'</div></div></div>';
@@ -1482,91 +1426,570 @@ function toast(html){
   const t=document.getElementById("toast");
   t.innerHTML=html; t.classList.add("on");
   clearTimeout(tT); tT=setTimeout(()=>t.classList.remove("on"),4200);
+}/* ==========================================================================
+   v4 — National Target Dashboard
+   Lapisan tampilan saja. Mesin data (recompute, weightedOf, natRows) tidak diubah.
+   ========================================================================== */
+const CL={brand:"#FF5515",blue:"#005A9C",ok:"#157F4B",warn:"#C77700",bad:"#C62828",
+  ln:"#E6E9EF",ln2:"#F0F2F6",ink:"#14161A",ink2:"#565D6D",ink3:"#8B92A1",ink4:"#AEB4C0"};
+const pc1=v=>v===null||v===undefined?"—":(v*100).toFixed(1)+"%";
+const pc0=v=>v===null||v===undefined?"—":(v*100).toFixed(0)+"%";
+const ppv=v=>v===null||v===undefined?"—":(v>0?"+":"")+(v*100).toFixed(1)+"pp";
+
+/* capaian terhadap threshold, sadar arah indikator */
+function achOf(w,dir,thr){
+  if(w.pE===null||!thr) return null;
+  const a = dir===-1 ? (w.pE>0 ? thr/w.pE : null) : w.pE/thr;
+  return (a===null||!isFinite(a)) ? null : a;
 }
-function chip(){
-  const c=document.getElementById("dataChip"); if(!c)return;
-  c.textContent = S.local ? "perubahan lokal · belum di-commit"
-    : (S.src==="csv" ? "CSV · "+n0(S.rows.length)+" baris" : CFG.version);
-  c.className = S.local ? "chip local" : (S.src==="csv" ? "chip csv" : "chip");
-  c.title = S.src==="csv"
-    ? "Dibaca dari "+(S.csv&&S.csv.path||"data/indicators.csv")+" · pemisah "+
-      (S.csv&&S.csv.delim)+" · desimal "+(S.csv&&S.csv.dec)
-    : "Dibaca dari data/indicators.js";
+function perInd(rows){
+  return S.cat.map(c=>{
+    const rs=rows.filter(r=>r.Indicator===c.ind);
+    if(!rs.length) return null;
+    const w=weightedOf(rs), dir=arahOf(c.ind)==="Turun"?-1:1;
+    const thrs=rs.map(r=>N(r.Threshold)).filter(v=>v>0);
+    const thr=thrs.length?thrs.sort((a,b)=>a-b)[thrs.length>>1]:null;
+    return {ind:c.ind,short:c.short,code:c.code,oc:c.oc,dir:dir,thr:thr,w:w,n:rs.length,
+      ach:achOf(w,dir,thr),
+      meets:(w.pE!==null&&thr)?(dir===-1?w.pE<=thr:w.pE>=thr):null};
+  }).filter(Boolean);
 }
-function loadLogo(){
-  const img=document.getElementById("wvLogo"); if(!img)return;
-  const tries=["assets/logo.svg","assets/logo.png","logo.svg","logo.png"]; let i=0;
-  const t=()=>{ if(i>=tries.length){img.remove();return;}
-    img.onload=()=>{img.hidden=false;}; img.onerror=()=>{i++;t();}; img.src=tries[i]; };
-  t();
+
+/* ---------------- grafik ---------------- */
+function chHBar(items){
+  if(!items.length) return '<div class="xempty">Tidak ada indikator pada filter ini.</div>';
+  const W=680,LW=228,BH=8,GAP=3,P=BH*2+GAP+18,H=items.length*P+22,PW=W-LW-62;
+  let s='<svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img"><title>Baseline vs Evaluation</title>';
+  for(let g=0;g<=4;g++){const x=LW+PW*g/4;
+    s+='<line x1="'+x+'" y1="6" x2="'+x+'" y2="'+(H-16)+'" stroke="'+CL.ln2+'"/>'+
+       '<text x="'+x+'" y="'+(H-4)+'" text-anchor="middle" font-size="9.5" fill="'+CL.ink4+'">'+(g*25)+'%</text>';}
+  items.forEach((it,i)=>{
+    const y=i*P+12;
+    s+='<text x="'+(LW-12)+'" y="'+(y+9)+'" text-anchor="end" font-size="11.5" fill="'+CL.ink+'">'+esc(it.label)+'</text>';
+    const wb=it.a==null?0:PW*Math.min(1,it.a), we=it.b==null?0:PW*Math.min(1,it.b);
+    s+='<rect x="'+LW+'" y="'+y+'" width="'+wb.toFixed(1)+'" height="'+BH+'" rx="3" fill="'+CL.blue+'" opacity=".85"/>'+
+       '<rect x="'+LW+'" y="'+(y+BH+GAP)+'" width="'+we.toFixed(1)+'" height="'+BH+'" rx="3" fill="'+CL.brand+'"/>'+
+       '<text x="'+(LW+Math.max(wb,we)+9).toFixed(1)+'" y="'+(y+BH+2)+'" font-size="10.5" fill="'+CL.ink2+'">'+
+       (it.a==null?"—":pc0(it.a))+' → <tspan font-weight="600" fill="'+CL.ink+'">'+(it.b==null?"—":pc0(it.b))+'</tspan></text>';
+  });
+  return s+'</svg>';
+}
+function chBullet(items){
+  if(!items.length) return '<div class="xempty">Tidak ada indikator dengan threshold pada filter ini.</div>';
+  const W=680,LW=228,BH=14,P=BH+16,H=items.length*P+22,PW=W-LW-66;
+  let s='<svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img"><title>Baseline vs Threshold, bullet chart</title>';
+  for(let g=0;g<=4;g++){const x=LW+PW*g/4;
+    s+='<text x="'+x+'" y="'+(H-4)+'" text-anchor="middle" font-size="9.5" fill="'+CL.ink4+'">'+(g*25)+'%</text>';}
+  items.forEach((it,i)=>{
+    const y=i*P+10;
+    s+='<text x="'+(LW-12)+'" y="'+(y+BH-3)+'" text-anchor="end" font-size="11.5" fill="'+CL.ink+'">'+esc(it.label)+'</text>';
+    s+='<rect x="'+LW+'" y="'+y+'" width="'+PW+'" height="'+BH+'" rx="3" fill="#F4F6F9"/>';
+    if(it.thr!=null){
+      const wt=PW*Math.min(1,it.thr);
+      s+='<rect x="'+LW+'" y="'+y+'" width="'+wt.toFixed(1)+'" height="'+BH+'" rx="3" fill="#E8ECF2"/>';
+    }
+    if(it.b!=null){
+      const we=PW*Math.min(1,it.b), col=it.meets?CL.ok:CL.brand;
+      s+='<rect x="'+LW+'" y="'+(y+4)+'" width="'+we.toFixed(1)+'" height="'+(BH-8)+'" rx="2" fill="'+col+'"/>';
+    }
+    if(it.a!=null){
+      const wb=LW+PW*Math.min(1,it.a);
+      s+='<circle cx="'+wb.toFixed(1)+'" cy="'+(y+BH/2)+'" r="3.2" fill="#fff" stroke="'+CL.blue+'" stroke-width="1.6"/>';
+    }
+    if(it.thr!=null){
+      const xt=LW+PW*Math.min(1,it.thr);
+      s+='<line x1="'+xt.toFixed(1)+'" y1="'+(y-2)+'" x2="'+xt.toFixed(1)+'" y2="'+(y+BH+2)+
+         '" stroke="'+CL.ink+'" stroke-width="2"/>';
+    }
+    s+='<text x="'+(LW+PW+10)+'" y="'+(y+BH-3)+'" font-size="10.5" font-weight="600" fill="'+
+       (it.meets?CL.ok:it.b==null?CL.ink4:CL.bad)+'">'+(it.b==null?"—":pc0(it.b))+'</text>';
+  });
+  return s+'</svg>';
+}
+function chDiverge(items){
+  if(!items.length) return '<div class="xempty">Belum ada indikator dengan baseline dan evaluation.</div>';
+  const W=680,LW=228,BH=10,P=BH+11,H=items.length*P+26,PW=W-LW-72;
+  const m=Math.max(.02,...items.map(i=>Math.abs(i.v||0))), sc=Math.ceil(m*20)/20;
+  const z=LW+PW/2, half=PW/2, x=v=>z+half*Math.max(-1,Math.min(1,(v||0)/sc));
+  let s='<svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img"><title>Delta per indikator</title>';
+  s+='<line x1="'+z+'" y1="14" x2="'+z+'" y2="'+(H-14)+'" stroke="'+CL.ink3+'" stroke-width="1"/>'+
+     '<text x="'+z+'" y="9" text-anchor="middle" font-size="9.5" fill="'+CL.ink4+'">0</text>'+
+     '<text x="'+LW+'" y="9" font-size="9.5" fill="'+CL.ink4+'">−'+(sc*100).toFixed(0)+'pp</text>'+
+     '<text x="'+(LW+PW)+'" y="9" text-anchor="end" font-size="9.5" fill="'+CL.ink4+'">+'+(sc*100).toFixed(0)+'pp</text>';
+  items.forEach((it,i)=>{
+    const y=i*P+16, xv=x(it.v);
+    const col=it.v>.001?CL.ok:it.v<-.001?CL.bad:CL.ink4;
+    s+='<text x="'+(LW-12)+'" y="'+(y+BH-1)+'" text-anchor="end" font-size="11.5" fill="'+CL.ink+'">'+esc(it.label)+'</text>'+
+       '<rect x="'+Math.min(z,xv).toFixed(1)+'" y="'+y+'" width="'+Math.abs(xv-z).toFixed(1)+
+       '" height="'+BH+'" rx="2" fill="'+col+'"/>'+
+       '<text x="'+(LW+PW+10)+'" y="'+(y+BH-1)+'" font-size="10.5" font-weight="600" fill="'+col+'">'+
+       ((it.v>0?"+":"")+(it.v*100).toFixed(1))+'</text>';
+  });
+  return s+'</svg>';
+}
+function chDonut(segs,centerVal,centerLab){
+  const tot=segs.reduce((a,s)=>a+s.v,0);
+  const W=300,H=200,cx=100,cy=100,R=76,r=50;
+  let s='<svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img"><title>'+esc(centerLab||"")+'</title>';
+  if(!tot){ s+='<circle cx="'+cx+'" cy="'+cy+'" r="'+((R+r)/2)+'" fill="none" stroke="'+CL.ln2+'" stroke-width="'+(R-r)+'"/>'; }
+  let a0=-Math.PI/2;
+  segs.forEach(sg=>{
+    if(!sg.v) return;
+    const a1=a0+2*Math.PI*sg.v/tot, big=(a1-a0)>Math.PI?1:0;
+    const p=(rr,a)=>[cx+rr*Math.cos(a),cy+rr*Math.sin(a)];
+    const [x1,y1]=p(R,a0),[x2,y2]=p(R,a1),[x3,y3]=p(r,a1),[x4,y4]=p(r,a0);
+    s+='<path d="M'+x1.toFixed(1)+' '+y1.toFixed(1)+'A'+R+' '+R+' 0 '+big+' 1 '+x2.toFixed(1)+' '+y2.toFixed(1)+
+       'L'+x3.toFixed(1)+' '+y3.toFixed(1)+'A'+r+' '+r+' 0 '+big+' 0 '+x4.toFixed(1)+' '+y4.toFixed(1)+'Z" fill="'+sg.c+'"/>';
+    a0=a1;
+  });
+  s+='<text x="'+cx+'" y="'+(cy-2)+'" text-anchor="middle" font-size="26" font-weight="600" fill="'+CL.ink+'">'+centerVal+'</text>'+
+     '<text x="'+cx+'" y="'+(cy+17)+'" text-anchor="middle" font-size="10" fill="'+CL.ink3+'">'+esc(centerLab||"")+'</text>';
+  let ly=32;
+  segs.forEach(sg=>{
+    s+='<rect x="205" y="'+(ly-8)+'" width="9" height="9" rx="2" fill="'+sg.c+'"/>'+
+       '<text x="220" y="'+ly+'" font-size="11" fill="'+CL.ink2+'">'+esc(sg.k)+'</text>'+
+       '<text x="292" y="'+ly+'" text-anchor="end" font-size="11" font-weight="600" fill="'+CL.ink+'">'+sg.v+'</text>';
+    ly+=22;
+  });
+  return s+'</svg>';
+}
+
+/* ---------------- kartu pembungkus ---------------- */
+function xcard(id,title,sub,body,foot){
+  return '<div class="xc" id="xc_'+id+'"><div class="xc-h"><div class="tt"><h3>'+title+'</h3>'+
+    (sub?'<div class="st">'+sub+'</div>':'')+'</div>'+
+    '<div class="xmenu" data-menu><button aria-label="Menu" data-mtoggle>⋯</button><div class="xmenu-pop">'+
+      '<button data-mact="csv" data-mid="'+id+'"><span>⤓</span> Export CSV</button>'+
+      '<button data-mact="print"><span>⎙</span> Cetak halaman</button>'+
+    '</div></div></div>'+
+    '<div class="xc-b">'+body+'</div>'+(foot?'<div class="xc-f">'+foot+'</div>':'')+'</div>';
+}
+
+/* ---------------- filter bar ---------------- */
+function ddl(field,label,items,selArr){
+  const n=selArr.length;
+  return '<div class="ddl'+(n?' act':'')+'" data-ddl="'+field+'"><button data-dtoggle>'+
+    '<span>'+label+(n?'':'')+'</span>'+(n?'<span class="cnt">'+n+'</span>':'<span style="color:#AEB4C0">▾</span>')+
+    '</button><div class="ddl-pop">'+
+    items.map(it=>'<label><input type="checkbox" data-fset="'+field+'" value="'+esc(it.v)+'"'+
+      (selArr.indexOf(it.v)>=0?' checked':'')+'><span>'+esc(it.lab||it.v)+'</span>'+
+      '<span class="n">'+it.n+'</span></label>').join('')+'</div></div>';
+}
+function filterBar(){
+  const all=S.rows;
+  const apPool=F.zonal.length?AP_LIST.filter(a=>F.zonal.indexOf(a.zonal)>=0):AP_LIST;
+  const indPool=S.cat.filter(c=>!F.outcome.length||F.outcome.indexOf(c.oc)>=0);
+  const q=(F.q||"").toLowerCase();
+  const chips=[]
+    .concat(F.zonal.map(v=>({f:"zonal",v:v,l:"Zone"})))
+    .concat(F.ap.map(v=>({f:"ap",v:v,l:"AP"})))
+    .concat(F.outcome.map(v=>({f:"outcome",v:v,l:"Outcome"})))
+    .concat(F.ind.map(v=>({f:"ind",v:shortOf(v),raw:v,l:"Indicator"})));
+  const nAkt=chips.length+(F.period!=="Both"?1:0)+(q?1:0);
+  return '<div class="fbar">'+
+    '<div class="fbar-h"><span class="lb">Filter</span>'+
+      '<span class="summ">'+(nAkt?esc(natActiveText()||"")+(q?' · "'+esc(F.q)+'"':''):'Seluruh dataset')+'</span>'+
+      '<div class="sp"></div>'+
+      '<div class="seg">'+["Baseline","Evaluation","Both"].map(p=>
+        '<button data-fperiod="'+p+'" class="'+(F.period===p?"on":"")+'">'+p+'</button>').join('')+'</div>'+
+      (nAkt?'<button class="tbtn" data-fact="reset"><i>↺</i>Reset filters</button>':'')+
+      '<button class="tbtn" data-fact="toggle">'+(F.fbOpen?'Sembunyikan ▴':'Filter lanjutan ▾')+'</button>'+
+    '</div>'+
+    (F.fbOpen?'<div class="fbar-b">'+
+      '<div class="fsearch"><i>⌕</i><input type="search" placeholder="Cari indikator…" value="'+esc(F.q||"")+'" data-fq></div>'+
+      ddl("zonal","Zone",ZONALS.map(z=>({v:z,n:all.filter(r=>r.Zonal===z).length})),F.zonal)+
+      ddl("ap","Area Program",apPool.map(a=>({v:a.ap,n:all.filter(r=>r["Area Program"]===a.ap).length})),F.ap)+
+      ddl("outcome","Outcome",OUTCOMES.map(o=>({v:o,n:all.filter(r=>r.Outcome===o).length})),F.outcome)+
+      ddl("ind","Indicator",indPool.map(c=>({v:c.ind,lab:c.short,n:all.filter(r=>r.Indicator===c.ind).length})),F.ind)+
+    '</div>':'')+
+    (chips.length?'<div class="fchips">'+chips.map(c=>'<span class="fchip"><span class="dim">'+c.l+'</span> <b>'+
+      esc(c.v)+'</b><button data-fdel="'+c.f+'" data-fval="'+esc(c.raw||c.v)+'" aria-label="Hapus">×</button></span>').join('')+
+      '</div>':'')+
+  '</div>';
 }
 
 /* ==========================================================================
-   KODE AKSES — pagar sopan, bukan pengamanan
+   HALAMAN 1 — DASHBOARD
    ========================================================================== */
-const GK="wvi_aimplus_gate_v2";
-const gateOK=()=>{try{return sessionStorage.getItem(GK)==="1";}catch(e){return false;}};
+function renderDash(){
+  let rows=natRows();
+  const q=(F.q||"").toLowerCase();
+  if(q) rows=rows.filter(r=>String(r.Indicator).toLowerCase().indexOf(q)>=0||
+    String(r.Code||"").toLowerCase().indexOf(q)>=0);
+  const per=perInd(rows);
+  const withE=per.filter(x=>x.w.pE!==null);
+  const withBoth=per.filter(x=>x.w.delta!==null);
+  const meets=per.filter(x=>x.meets===true);
+  const ach=per.map(x=>x.ach).filter(v=>v!==null);
+  const medAch=ach.length?ach.slice().sort((a,b)=>a-b)[ach.length>>1]:null;
+  const naik=withBoth.filter(x=>x.w.delta>.001), turun=withBoth.filter(x=>x.w.delta<-.001);
+
+  /* ringkasan capaian */
+  const band=[{k:"≥ 90%",c:CL.ok,v:0},{k:"75 – 89%",c:"#7FB069",v:0},
+              {k:"50 – 74%",c:CL.warn,v:0},{k:"< 50%",c:CL.bad,v:0},
+              {k:"Belum ada data",c:CL.ln,v:0}];
+  per.forEach(x=>{
+    if(x.ach===null){ band[4].v++; return; }
+    const a=x.ach*100;
+    if(a>=90) band[0].v++; else if(a>=75) band[1].v++; else if(a>=50) band[2].v++; else band[3].v++;
+  });
+  /* per outcome */
+  const ocSeg=OUTCOMES.filter(o=>per.some(x=>x.oc===o)).map((o,i)=>({
+    k:o, v:per.filter(x=>x.oc===o).length,
+    c:[CL.blue,"#2E7DB8","#5FA8D3",CL.brand,"#C77700"][i%5]}));
+  /* outcome terbaik & terlemah */
+  const ocStat=OUTCOMES.map(o=>{
+    const g=per.filter(x=>x.oc===o&&x.ach!==null);
+    if(!g.length) return null;
+    const s=g.map(x=>x.ach).sort((a,b)=>a-b);
+    return {oc:o,med:s[s.length>>1],n:g.length,meets:g.filter(x=>x.meets).length};
+  }).filter(Boolean).sort((a,b)=>b.med-a.med);
+  /* AP */
+  const apStat=uniq(rows.map(r=>r["Area Program"])).map(ap=>{
+    const rs=rows.filter(r=>r["Area Program"]===ap);
+    const ok=rs.filter(r=>r._thr_status===">= threshold").length;
+    const m=rs.filter(r=>r._thr_status!=="Belum ada data").length;
+    return {ap:ap,ok:ok,m:m,rate:m?ok/m:null};
+  }).filter(x=>x.rate!==null).sort((a,b)=>b.rate-a.rate);
+
+  const top=withBoth.slice().sort((a,b)=>b.w.delta-a.w.delta).slice(0,10);
+  const bot=withBoth.slice().sort((a,b)=>a.w.delta-b.w.delta).slice(0,10);
+  const attn=per.filter(x=>x.meets===false).sort((a,b)=>(a.ach||0)-(b.ach||0));
+
+  const K=(ic,tone,lab,val,sub)=>'<div class="c3"><div class="kpi click" data-kpi="'+lab+'">'+
+    '<div class="kpi-top"><span class="kpi-ic '+tone+'">'+ic+'</span><span class="kpi-lab">'+lab+'</span></div>'+
+    '<div class="kpi-val">'+val+'</div><div class="kpi-sub">'+(sub||"&nbsp;")+'</div></div></div>';
+
+  return '<div class="bcrumb">Dashboard <b>·</b> Indonesia National Summary</div>'+
+  '<div class="grid" style="margin-bottom:24px">'+
+    K("◎","t-brand","Area Program",uniq(rows.map(r=>r["Area Program"])).length,
+      "dari "+AP_LIST.length+" terdaftar")+
+    K("◍","t-blue","Zones",uniq(rows.map(r=>r.Zonal)).length,ZONALS.join(" · "))+
+    K("◈","t-warn","Outcomes",uniq(rows.map(r=>r.Outcome).filter(Boolean)).length,"Goal dan OC 1 – OC 4")+
+    K("▦","t-gray","Indicators",per.length,n0(rows.length)+" baris data")+
+  '</div>'+
+
+  filterBar()+
+
+  '<div class="grid">'+
+    '<div class="c8">'+xcard("cmp","Baseline vs Evaluation",
+      "Weighted National — Σ Numerator ÷ Σ Denominator, per indikator",
+      chHBar(per.map(x=>({label:x.short+(x.dir===-1?" ↓":""),
+        a:F.period!=="Evaluation"?x.w.pB:null, b:F.period!=="Baseline"?x.w.pE:null}))),
+      '<span style="display:inline-flex;gap:16px"><span><i style="display:inline-block;width:9px;height:9px;'+
+      'border-radius:2px;background:'+CL.blue+'"></i> Baseline FY26</span>'+
+      '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+CL.brand+
+      '"></i> Evaluation FY30</span><span>↓ indikator reduksi — penurunan berarti perbaikan</span></span>')+'</div>'+
+
+    '<div class="c4">'+xcard("ins","Executive Insights","Mengikuti filter di atas",
+      '<div class="ins">'+[
+        ['t-ok','✓','<b>'+meets.length+' dari '+per.filter(x=>x.meets!==null).length+
+          '</b> indikator sudah mencapai threshold.'],
+        ['t-blue','◈',ocStat.length?'Outcome dengan capaian tertinggi: <b>'+esc(ocStat[0].oc)+
+          '</b> (median '+pc0(ocStat[0].med)+' dari threshold).':'Belum ada outcome yang bisa dinilai.'],
+        ['t-warn','◈',ocStat.length>1?'Outcome terlemah: <b>'+esc(ocStat[ocStat.length-1].oc)+
+          '</b> (median '+pc0(ocStat[ocStat.length-1].med)+').':'&nbsp;'],
+        ['t-bad','↓','<b>'+turun.length+'</b> indikator menurun dibanding baseline, <b>'+naik.length+
+          '</b> meningkat.'],
+        ['t-ok','◎',apStat.length?'AP terbaik: <b>'+esc(apStat[0].ap)+'</b> ('+apStat[0].ok+' dari '+
+          apStat[0].m+' indikator di atas threshold).':'&nbsp;'],
+        ['t-bad','◎',apStat.length>1?'AP perlu perhatian: <b>'+esc(apStat[apStat.length-1].ap)+
+          '</b> ('+apStat[apStat.length-1].ok+' dari '+apStat[apStat.length-1].m+').':'&nbsp;'],
+        ['t-gray','▦',medAch!==null?'Median capaian nasional terhadap threshold: <b>'+pc0(medAch)+'</b>.':'&nbsp;']
+      ].filter(x=>x[2]!=="&nbsp;").map(x=>'<div class="ins-i"><span class="ins-d '+x[0]+'">'+x[1]+
+        '</span><div class="ins-t">'+x[2]+'</div></div>').join('')+'</div>')+'</div>'+
+
+    '<div class="c6">'+xcard("bul","Evaluation vs Threshold",
+      "Bullet chart — batang gelap = threshold, titik = baseline",
+      chBullet(per.filter(x=>x.thr!=null).sort((a,b)=>(a.ach||0)-(b.ach||0))
+        .map(x=>({label:x.short+(x.dir===-1?" ↓":""),a:x.w.pB,b:x.w.pE,thr:x.thr,meets:x.meets}))),
+      "Diurutkan dari capaian terendah. Hijau berarti threshold tercapai.")+'</div>'+
+
+    '<div class="c6">'+xcard("perf","Performance Summary",
+      "Capaian evaluation terhadap threshold, disesuaikan arah indikator",
+      chDonut(band, String(meets.length), "capai threshold"),
+      "Indikator reduksi dihitung terbalik: makin rendah nilainya, makin tinggi capaiannya.")+'</div>'+
+
+    '<div class="c6">'+xcard("dlt","Delta per Indicator","Poin persentase, peningkatan terbesar di atas",
+      chDiverge(withBoth.slice().sort((a,b)=>b.w.delta-a.w.delta)
+        .map(x=>({label:x.short+(x.dir===-1?" ↓":""),v:x.w.delta}))),
+      (top.length?'Top improvement: <b style="color:'+CL.ok+'">'+esc(top[0].short)+' '+ppv(top[0].w.delta)+
+        '</b> &nbsp;·&nbsp; Bottom: <b style="color:'+CL.bad+'">'+esc(bot[0].short)+' '+ppv(bot[0].w.delta)+'</b>':''))+'</div>'+
+
+    '<div class="c6">'+xcard("ocs","Outcome Summary","Jumlah indikator per outcome",
+      chDonut(ocSeg, String(per.length), "indikator"),
+      ocStat.length?'Capaian tertinggi <b>'+esc(ocStat[0].oc)+'</b>, terendah <b>'+
+        esc(ocStat[ocStat.length-1].oc)+'</b>.':'')+'</div>'+
+
+    '<div class="c6">'+xcard("top","Top Performing Indicators","Peningkatan terbesar dibanding baseline",
+      tbl(top,"up"))+'</div>'+
+    '<div class="c6">'+xcard("bot","Lowest Performing Indicators","Penurunan terbesar dibanding baseline",
+      tbl(bot,"down"))+'</div>'+
+
+    '<div class="c12">'+xcard("attn","Indicators Requiring Attention",
+      attn.length+" indikator masih di bawah threshold",
+      attn.length?'<div class="tscroll"><table class="tb"><thead><tr><th>Indicator</th><th>Outcome</th>'+
+        '<th class="r">Evaluation</th><th class="r">Threshold</th><th class="r">Gap (pp)</th>'+
+        '<th class="r">Capaian</th><th>Status</th></tr></thead><tbody>'+
+        attn.map(x=>{
+          const gap=x.dir===-1?(x.w.pE-x.thr):(x.thr-x.w.pE);
+          const a=x.ach===null?null:x.ach*100;
+          return '<tr><td class="nm">'+esc(x.short)+(x.dir===-1?' <span class="dim">↓</span>':'')+'</td>'+
+          '<td class="dim">'+esc(x.oc||"—")+'</td>'+
+          '<td class="r">'+pc1(x.w.pE)+'</td><td class="r dim">'+pc1(x.thr)+'</td>'+
+          '<td class="r xdown">'+(gap*100).toFixed(1)+'</td>'+
+          '<td class="r">'+(a===null?"—":a.toFixed(0)+"%")+'</td>'+
+          '<td>'+(a===null?'<span class="ppill p-gray"><span class="dt"></span>Belum ada data</span>'
+            :a>=75?'<span class="ppill p-warn"><span class="dt"></span>Mendekati</span>'
+            :'<span class="ppill p-bad"><span class="dt"></span>Perlu perhatian</span>')+'</td></tr>';
+        }).join('')+'</tbody></table></div>'
+        :'<div class="xempty">Semua indikator pada filter ini sudah mencapai threshold.</div>')+'</div>'+
+  '</div>';
+}
+function tbl(list,dir){
+  if(!list.length) return '<div class="xempty">Belum ada indikator dengan baseline dan evaluation.</div>';
+  return '<div class="tscroll"><table class="tb"><thead><tr><th style="width:34px"></th><th>Indicator</th>'+
+    '<th class="r">Baseline</th><th class="r">Evaluation</th><th class="r">Delta</th></tr></thead><tbody>'+
+    list.map((x,i)=>'<tr><td><span class="rank">'+(i+1)+'</span></td>'+
+      '<td class="nm">'+esc(x.short)+(x.dir===-1?' <span class="dim">↓</span>':'')+'</td>'+
+      '<td class="r dim">'+pc1(x.w.pB)+'</td><td class="r">'+pc1(x.w.pE)+'</td>'+
+      '<td class="r '+(x.w.delta>0?"xup":x.w.delta<0?"xdown":"xflat")+'">'+ppv(x.w.delta)+'</td></tr>').join('')+
+    '</tbody></table></div>';
+}
+
+/* ==========================================================================
+   HALAMAN Reports & Settings
+   ========================================================================== */
+function renderReports(){
+  return '<div class="bcrumb">Reports</div><div class="grid">'+
+    '<div class="c6">'+xcard("rp1","Unduh data","Berkas siap dibuka di Excel",
+      '<div style="display:flex;flex-direction:column;gap:10px">'+
+      '<button class="tbtn" data-fact="csvAll"><i>⤓</i>Data lengkap sesuai filter (CSV)</button>'+
+      '<button class="tbtn" data-fact="csvNat"><i>⤓</i>National summary per indikator (CSV)</button>'+
+      '<button class="tbtn" data-fact="print"><i>⎙</i>Cetak dashboard</button></div>')+'</div>'+
+    '<div class="c6">'+xcard("rp2","Berkas untuk repository","Commit ke folder data/",
+      '<div style="display:flex;flex-direction:column;gap:10px">'+
+      '<button class="tbtn" data-fact="dlAsumsi"><i>⤒</i>asumsi.js</button>'+
+      '<button class="tbtn" data-fact="dlPemetaan"><i>⤒</i>pemetaan.js</button>'+
+      '<button class="tbtn" data-fact="dlIndicators"><i>⤒</i>indicators.js</button></div>',
+      "Perubahan pada Assumptions dan Mapping baru permanen setelah file-nya di-commit.")+'</div>'+
+  '</div>';
+}
+function renderSettings(){
+  const c=checks();
+  const chip=(lab,ok,val)=>'<div class="ins-i"><span class="ins-d '+(ok?"t-ok":"t-bad")+'">'+(ok?"✓":"!")+
+    '</span><div class="ins-t"><b>'+esc(lab)+'</b><br><span class="dim">'+esc(val)+'</span></div></div>';
+  return '<div class="bcrumb">Settings <b>·</b> Admin</div>'+
+  '<div class="grid">'+
+    '<div class="c6">'+xcard("st1","Integritas data","Pemeriksaan teknis, disembunyikan dari dashboard utama",
+      chip("Row ID",c.rowid==="ROW ID OK",c.rowid)+
+      chip("Sinkronisasi baris",c.sinkron==="SINKRON",c.sinkron)+
+      chip("Duplikat AP × indikator",c.comboDupe===0,c.dupe+" · "+n0(c.dupeRows)+" baris")+
+      chip("Proporsi dalam 0–100%",c.oor===0,c.range)+
+      chip("Numerator ≤ denominator",c.nd===0,c.numden))+'</div>'+
+    '<div class="c6">'+xcard("st2","Sumber data",
+      S.src==="csv"?"Otomatis dari pipeline Power Automate":"Berkas statis di repository",
+      '<div class="ins">'+
+      '<div class="ins-i"><span class="ins-d '+(S.src==="csv"?"t-ok":"t-gray")+'">◈</span><div class="ins-t">'+
+        '<b>'+(S.src==="csv"?"data/indicators.csv":"data/indicators.js")+'</b><br>'+
+        '<span class="dim">'+n0(S.rows.length)+' baris'+(S.src==="csv"&&S.csv?
+        ' · pemisah '+esc(S.csv.delim)+' · desimal '+esc(S.csv.dec):'')+'</span></div></div>'+
+      '<div class="ins-i"><span class="ins-d t-gray">◉</span><div class="ins-t"><b>Versi</b><br>'+
+        '<span class="dim">'+esc(CFG.version)+' · data per '+esc(CFG.data_date)+'</span></div></div>'+
+      (S.local?'<div class="ins-i"><span class="ins-d t-warn">!</span><div class="ins-t">'+
+        '<b>Ada perubahan lokal</b><br><span class="dim">Belum di-commit ke repository</span></div></div>':'')+
+      '</div>',
+      '<div style="display:flex;gap:9px;flex-wrap:wrap"><button class="tbtn" data-fact="import"><i>⤓</i>Impor data</button>'+
+      '<button class="tbtn" data-fact="reload"><i>↺</i>Muat ulang data repo</button></div>')+'</div>'+
+  '</div>';
+}
+/* ==========================================================================
+   v4 — SHELL: sidebar, topbar, routing
+   ========================================================================== */
+const PAGES=[
+ {id:"dashboard",   ic:"◫", nm:"Dashboard",   t:"National Target Dashboard", s:"Indonesia National Summary", r:renderDash},
+ {id:"summary",     ic:"▤", nm:"Summary",     t:"All Indicators",            s:"Tabel lengkap seluruh baris",     r:()=>legacy(renderSummary)},
+ {id:"analysis",    ic:"◪", nm:"Analysis",    t:"Analysis by Area Programme",s:"Baseline versus endline per AP",  r:()=>legacy(renderAnalisis)},
+ {id:"mapping",     ic:"⊞", nm:"Mapping",     t:"Indicator Mapping",         s:"Matriks indikator × Area Programme", r:()=>legacy(renderPemetaan)},
+ {id:"assumptions", ic:"◇", nm:"Assumptions", t:"Indicator Assumptions",     s:"Arah dan target delta per indikator", r:()=>legacy(renderAsumsi)},
+ {id:"reports",     ic:"⤓", nm:"Reports",     t:"Reports",                   s:"Unduhan dan cetak",              r:renderReports},
+ {id:"settings",    ic:"⚙", nm:"Settings",    t:"Settings",                  s:"Sumber data dan pemeriksaan teknis", r:renderSettings}
+];
+let PG="dashboard";
+const legacy = fn => '<div class="legacy">'+fn()+'</div>';
+
+function shell(){
+  document.getElementById("app").innerHTML=
+  '<div class="shell">'+
+    '<aside class="side" id="side">'+
+      '<div class="side-top"><span class="side-logo" id="lgBox">WV</span>'+
+        '<span class="side-org"><b>Wahana Visi Indonesia</b><em>AIM+ Target Setting</em></span></div>'+
+      '<nav class="nav">'+
+        '<div class="nav-lab">Analytics</div>'+
+        PAGES.slice(0,5).map(p=>navlink(p)).join('')+
+        '<div class="nav-lab">Tools</div>'+
+        PAGES.slice(5).map(p=>navlink(p)).join('')+
+      '</nav>'+
+      '<div class="side-foot"><button data-side><span style="font-style:normal">⇤</span><em class="nav-txt">Perkecil menu</em></button></div>'+
+    '</aside>'+
+    '<div class="mainw">'+
+      '<header class="top">'+
+        '<button class="iconbtn" data-side style="display:none" id="burger">☰</button>'+
+        '<div class="top-mid"><h1 id="pgT"></h1><div class="subt" id="pgS"></div></div>'+
+        '<div class="top-right">'+
+          '<div class="upd"><b>Last updated</b><em id="upd"></em></div>'+
+          '<button class="iconbtn" data-fact="import" title="Impor data">⤓</button>'+
+          '<button class="iconbtn" data-go="settings" title="Settings">⚙</button>'+
+          '<span class="avatar" title="'+esc(CFG.owner||"")+'">WV</span>'+
+        '</div>'+
+      '</header>'+
+      '<main class="page" id="pg"></main>'+
+    '</div>'+
+  '</div>';
+  document.getElementById("upd").textContent=CFG.data_date||"";
+  logo();
+}
+const navlink = p => '<a href="#" data-go="'+p.id+'"><i>'+p.ic+'</i><span class="nav-txt">'+p.nm+'</span></a>';
+
+function logo(){
+  const b=document.getElementById("lgBox"); if(!b)return;
+  const tries=["assets/logo.svg","assets/logo.png","logo.svg","logo.png"]; let i=0;
+  const img=document.createElement("img"); img.alt="World Vision";
+  const t=()=>{ if(i>=tries.length) return;
+    img.onload=()=>{ b.innerHTML=""; b.appendChild(img); };
+    img.onerror=()=>{ i++; t(); }; img.src=tries[i]; };
+  t();
+}
+function go(id){
+  const p=PAGES.find(x=>x.id===id); if(!p)return;
+  PG=id;
+  document.getElementById("pgT").textContent=p.t;
+  document.getElementById("pgS").textContent=p.s;
+  document.querySelectorAll(".nav a").forEach(a=>a.classList.toggle("on",a.dataset.go===id));
+  document.getElementById("side").classList.remove("show");
+  paint();
+  window.scrollTo({top:0,behavior:"instant"});
+}
+function paint(){
+  const p=PAGES.find(x=>x.id===PG); if(!p)return;
+  document.getElementById("pg").innerHTML=p.r();
+  wireAll();
+}
+const repaint=paint;
+
+/* ---------------- wiring ---------------- */
+function wireAll(){
+  const root=document.getElementById("pg");
+  document.querySelectorAll("[data-go]").forEach(a=>a.onclick=e=>{e.preventDefault();go(a.dataset.go);});
+  document.querySelectorAll("[data-side]").forEach(b=>b.onclick=()=>{
+    const s=document.getElementById("side");
+    if(window.innerWidth<=900) s.classList.toggle("show"); else s.classList.toggle("mini");
+  });
+  /* filter */
+  root.querySelectorAll("[data-fperiod]").forEach(b=>b.onclick=()=>{F.period=b.dataset.fperiod;paint();});
+  root.querySelectorAll("[data-fact]").forEach(b=>b.onclick=()=>fact(b.dataset.fact));
+  document.querySelectorAll("[data-fact]").forEach(b=>b.onclick=()=>fact(b.dataset.fact));
+  root.querySelectorAll("[data-dtoggle]").forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    const d=b.closest(".ddl"), open=d.classList.contains("open");
+    root.querySelectorAll(".ddl").forEach(x=>x.classList.remove("open"));
+    if(!open) d.classList.add("open");
+  });
+  root.querySelectorAll("[data-fset]").forEach(c=>c.onchange=()=>{
+    const f=c.dataset.fset, v=c.value, i=F[f].indexOf(v);
+    c.checked ? (i<0&&F[f].push(v)) : (i>=0&&F[f].splice(i,1));
+    if(f==="zonal") F.ap=F.ap.filter(a=>!F.zonal.length||F.zonal.indexOf(S.apz[a])>=0);
+    if(f==="outcome") F.ind=F.ind.filter(x=>!F.outcome.length||F.outcome.indexOf((CAT_BY_IND[x]||{}).oc)>=0);
+    paint();
+  });
+  root.querySelectorAll("[data-fdel]").forEach(b=>b.onclick=()=>{
+    const f=b.dataset.fdel, v=b.dataset.fval, i=F[f].indexOf(v);
+    if(i>=0) F[f].splice(i,1); paint();
+  });
+  const q=root.querySelector("[data-fq]");
+  if(q) q.oninput=()=>{ clearTimeout(q._t); q._t=setTimeout(()=>{F.q=q.value;paint();},260); };
+  /* menu kartu */
+  root.querySelectorAll("[data-mtoggle]").forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    const m=b.closest(".xmenu"), open=m.classList.contains("open");
+    root.querySelectorAll(".xmenu").forEach(x=>x.classList.remove("open"));
+    if(!open) m.classList.add("open");
+  });
+  root.querySelectorAll("[data-mact]").forEach(b=>b.onclick=()=>{
+    if(b.dataset.mact==="print") window.print(); else csvNational();
+    root.querySelectorAll(".xmenu").forEach(x=>x.classList.remove("open"));
+  });
+  document.body.onclick=()=>{
+    document.querySelectorAll(".ddl.open,.xmenu.open").forEach(x=>x.classList.remove("open"));
+  };
+  /* halaman legacy tetap memakai wiring lamanya */
+  if(["summary","analysis","mapping","assumptions"].indexOf(PG)>=0) wire(PG,root);
+}
+function fact(a){
+  if(a==="toggle"){ F.fbOpen=!F.fbOpen; paint(); return; }
+  if(a==="reset"){ F.zonal=[];F.ap=[];F.outcome=[];F.ind=[];F.status=[];F.period="Both";F.q="";paint(); return; }
+  if(a==="print"){ window.print(); return; }
+  if(a==="import"){ document.getElementById("scrimImport").classList.add("on"); return; }
+  if(a==="reload"){ clearLocal(); location.reload(); return; }
+  if(a==="csvNat") return csvNational();
+  if(a==="csvAll") return dlCsv();
+  if(a==="dlAsumsi")     return dl("asumsi.js",fileAsumsi(),"text/javascript");
+  if(a==="dlPemetaan")   return dl("pemetaan.js",filePemetaan(),"text/javascript");
+  if(a==="dlIndicators") return dl("indicators.js",fileIndicators(),"text/javascript");
+}
+function csvNational(){
+  const per=perInd(natRows());
+  const cols=["Outcome","Code","Indicator","Baseline Numerator","Baseline Denominator","Baseline (%)",
+    "Evaluation Numerator","Evaluation Denominator","Evaluation (%)","Delta (pp)","Threshold (%)",
+    "Achievement (%)","AP Baseline","AP Evaluation"];
+  const q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+  const body=per.map(x=>[x.oc,x.code,x.ind,x.w.dB?x.w.nB:"",x.w.dB||"",
+    x.w.pB===null?"":(x.w.pB*100).toFixed(4), x.w.dE?x.w.nE:"", x.w.dE||"",
+    x.w.pE===null?"":(x.w.pE*100).toFixed(4),
+    x.w.delta===null?"":(x.w.delta*100).toFixed(4), x.thr===null?"":(x.thr*100).toFixed(4),
+    x.ach===null?"":(x.ach*100).toFixed(1), x.w.apB, x.w.apE].map(q).join(","));
+  dl("national_summary.csv","\ufeff"+[cols.map(q).join(",")].concat(body).join("\r\n"),"text/csv");
+}
+
+/* ---------------- gate ---------------- */
+const GK2="wvi_gate_v4";
 function showGate(next){
-  const st=document.createElement("style");
-  st.textContent="#gate{position:fixed;inset:0;z-index:200;background:#111222;display:flex;align-items:center;"+
-   "justify-content:center;padding:24px;font-family:'Inter',-apple-system,'Segoe UI',Calibri,sans-serif}"+
-   "#gate .box{width:100%;max-width:430px}"+
-   "#gate .eyebrow{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#FF8B5C}"+
-   "#gate h1{margin:10px 0 0;font-size:23px;line-height:1.2;font-weight:700;color:#fff}"+
-   "#gate .cyc{margin-top:7px;font-size:12px;color:#9C99A6}"+
-   "#gate .rule{height:2px;width:54px;background:#FF5515;margin:20px 0 22px}"+
-   "#gate label{display:block;font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9C99A6;margin-bottom:7px}"+
-   "#gate .row{display:flex;gap:9px}"+
-   "#gate input{flex:1;background:#1B1C2E;border:1px solid #3A3947;color:#fff;padding:11px 13px;font-size:14px;border-radius:2px;letter-spacing:.14em}"+
-   "#gate input:focus{outline:none;border-color:#FF5515}"+
-   "#gate button{background:#FF5515;border:none;color:#fff;font-weight:700;font-size:13px;padding:11px 20px;border-radius:2px;cursor:pointer}"+
-   "#gate .err{min-height:18px;margin-top:11px;font-size:11.5px;font-weight:600;color:#FF8B7A}"+
-   "#gate .note{margin-top:26px;padding-top:16px;border-top:1px solid #2A2937;font-size:10.5px;line-height:1.65;color:#6F6D7A}"+
-   "#gate .note b{color:#9C99A6}";
-  document.head.appendChild(st);
   const g=document.createElement("div"); g.id="gate";
-  g.innerHTML='<div class="box"><div class="eyebrow">PEARL · Wahana Visi Indonesia</div>'+
-    '<h1>AIM+ Target Setting</h1><div class="cyc">'+esc(CFG.cycle)+' · '+esc(CFG.version)+'</div>'+
-    '<div class="rule"></div><label for="gi">Kode akses</label>'+
-    '<div class="row"><input id="gi" type="password" placeholder="••••••••" autocomplete="off" spellcheck="false">'+
-    '<button id="gb">Buka</button></div><div class="err" id="ge"></div>'+
-    '<div class="note">File kerja internal. Baseline dan endline <b>masih bergerak</b> — '+
-    'belum ada angka yang final, dan tidak untuk diedarkan di luar WVI.</div></div>';
+  g.innerHTML='<div class="box"><div class="lg">WV</div>'+
+    '<h1>National Target Dashboard</h1>'+
+    '<div class="cy">Wahana Visi Indonesia · '+esc(CFG.cycle)+'</div>'+
+    '<label for="gi">Access code</label>'+
+    '<input id="gi" type="password" placeholder="••••••••" autocomplete="off" spellcheck="false">'+
+    '<button id="gb">Open dashboard</button><div class="er" id="ge"></div>'+
+    '<div class="nt">Berkas kerja internal. Baseline dan evaluation masih bergerak; '+
+    'belum ada angka final, dan tidak untuk diedarkan di luar WVI.</div></div>';
   document.body.appendChild(g);
-  const inp=g.querySelector("#gi"), err=g.querySelector("#ge");
-  const submit=()=>{
+  const inp=g.querySelector("#gi"), er=g.querySelector("#ge");
+  const sub=()=>{
     if(String(inp.value||"").trim().toLowerCase()===String(CFG.code).toLowerCase()){
-      try{sessionStorage.setItem(GK,"1");}catch(e){}
+      try{sessionStorage.setItem(GK2,"1");}catch(e){}
       g.remove(); next(); return;
     }
-    err.textContent="Kode itu tidak membuka halaman ini."; inp.value=""; inp.focus();
+    er.textContent="Kode itu tidak membuka dashboard ini."; inp.value=""; inp.focus();
   };
-  g.querySelector("#gb").onclick=submit;
-  inp.onkeydown=ev=>{ if(ev.key==="Enter") submit(); };
+  g.querySelector("#gb").onclick=sub;
+  inp.onkeydown=e=>{ if(e.key==="Enter") sub(); };
   setTimeout(()=>inp.focus(),40);
 }
 
-/* ==========================================================================
-   BOOT
-   ========================================================================== */
+/* ---------------- boot ---------------- */
 async function boot(){
   if(!window.WVI_CONFIG||!window.WVI_INDICATORS||!window.WVI_ASUMSI||!window.WVI_PEMETAAN){
-    document.getElementById("sheets").innerHTML=
-      '<div class="sheet on" style="padding:38px 26px"><h1 class="title">File data tidak termuat</h1>'+
-      '<p style="margin-top:14px">Halaman ini membutuhkan empat file di sebelahnya:</p>'+
-      '<div class="colspec">data/config.js\ndata/indicators.js\ndata/asumsi.js\ndata/pemetaan.js</div>'+
-      '<p>Pastikan keempatnya ter-commit dan namanya tidak berubah.</p></div>';
+    document.getElementById("app").innerHTML='<div style="padding:40px;max-width:640px">'+
+      '<h2 style="font-size:18px">Berkas data tidak termuat</h2>'+
+      '<p style="color:#565D6D">Halaman ini membutuhkan data/config.js, data/indicators.js, '+
+      'data/asumsi.js, dan data/pemetaan.js.</p></div>';
     return;
   }
   adopt();
-  /* CSV dari pipeline Power Automate menang atas indicators.js kalau ada */
   S.csv=await tryCsv();
-  if(S.csv&&S.csv.rows){
-    S.rows=S.csv.rows.map(r=>Object.assign({},r));
-    S.src="csv";
-  } else if(S.csv&&S.csv.err){
-    S.src="js"; S.csvErr=S.csv.err;
-  } else S.src="js";
+  if(S.csv&&S.csv.rows){ S.rows=S.csv.rows.map(r=>Object.assign({},r)); S.src="csv"; }
+  else { S.src="js"; if(S.csv&&S.csv.err) S.csvErr=S.csv.err; }
   recompute();
   const sv=loadLocal();
   if(sv&&sv.rows&&sv.rows.length){
@@ -1575,36 +1998,25 @@ async function boot(){
       if(sv.pemetaan) S.pemetaan=sv.pemetaan;
       if(sv.target_delta!=null) CFG.target_delta=sv.target_delta;
       const col=window.WVI_INDICATORS.columns;
-      S.rows=sv.rows.map(o=>{const r={}; col.forEach(k=>r[k]=o[k]); return r;});
+      S.rows=sv.rows.map(o=>{const r={};col.forEach(k=>r[k]=o[k]);return r;});
       S.local=true; recompute();
     }catch(e){ S.local=false; }
   }
-  if(gateOK()) open2(); else showGate(open2);
+  F.q=""; F.fbOpen=false;
+  let ok=false; try{ ok=sessionStorage.getItem(GK2)==="1"; }catch(e){}
+  if(ok) open4(); else showGate(open4);
 }
-function open2(){
-  buildFrames(); chip(); loadLogo();
-  document.getElementById("tabbar").onclick=ev=>{
-    const t=ev.target.closest(".tab"); if(t) go(t.dataset.tab);
-  };
-  const on=(id,fn)=>{const e=document.getElementById(id); if(e) e.onclick=fn;};
-  on("btnPrint",()=>window.print());
-  on("btnSave",()=>{
-    dl("asumsi.js",fileAsumsi(),"text/javascript");
-    setTimeout(()=>dl("pemetaan.js",filePemetaan(),"text/javascript"),350);
-    setTimeout(()=>dl("indicators.js",fileIndicators(),"text/javascript"),700);
-    toast('Tiga file data diunduh. Commit ke folder <b>data/</b> dengan nama yang sama.');
+function open4(){
+  shell();
+  document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest(".scrim").classList.remove("on"));
+  document.querySelectorAll(".scrim").forEach(s=>s.onclick=e=>{ if(e.target===s) s.classList.remove("on"); });
+  document.addEventListener("keydown",e=>{
+    if(e.key==="Escape") document.querySelectorAll(".scrim.on").forEach(s=>s.classList.remove("on"));
   });
-  on("btnCsv",dlCsv);
-  on("btnImport",()=>document.getElementById("scrimImport").classList.add("on"));
-  on("impCheck",impParse);
-  on("impGo",impApply);
-  document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>
-    b.closest(".scrim").classList.remove("on"));
-  document.querySelectorAll(".scrim").forEach(s=>s.onclick=ev=>{
-    if(ev.target===s) s.classList.remove("on");});
-  document.addEventListener("keydown",ev=>{
-    if(ev.key==="Escape") document.querySelectorAll(".scrim.on").forEach(s=>s.classList.remove("on"));});
-  on("btnReset",()=>{clearLocal();location.reload();});
-  go("NASIONAL");
+  const on=(id,fn)=>{const e=document.getElementById(id); if(e) e.onclick=fn;};
+  on("impCheck",impParse); on("impGo",impApply);
+  if(window.innerWidth<=900) document.getElementById("burger").style.display="grid";
+  go("dashboard");
 }
+function chip(){ /* indikator sumber data dipindah ke halaman Settings */ }
 document.addEventListener("DOMContentLoaded",boot);
