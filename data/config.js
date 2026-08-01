@@ -4,7 +4,7 @@
    ========================================================================== */
 window.WVI_CONFIG = {
   cycle: "Target Setting FY27–FY30",
-  version: "v2.3",
+  version: "v3.0",
   data_date: "31 Jul 2026",
   owner: "PEARL — Wahana Visi Indonesia",
   access_code: "wvipearl",
