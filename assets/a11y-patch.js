@@ -1,5 +1,5 @@
 /* =============================================================================
-   assets/a11y-patch.js  ·  v1.1
+   assets/a11y-patch.js  ·  v1.3
    AIM+ AP Target Setting — Decision Workbook
    -----------------------------------------------------------------------------
    File terpisah, dimuat SETELAH assets/app.js di index.html. Tidak ada satu
@@ -16,6 +16,13 @@
 (function (w, d) {
   'use strict';
 
+  /* Titik pasang aplikasi. Dashboard ini merender ke #app; versi workbook
+     lama memakai #sheets. Keduanya didukung supaya patch tidak perlu diubah
+     lagi kalau kerangkanya berganti. */
+  function mount() {
+    return d.getElementById('app') || d.getElementById('sheets') || null;
+  }
+
   /* ---------------------------------------------------------------------------
      11.A · KAMUS ARIA-LABEL  (audit poin 3)
      ---------------------------------------------------------------------------
@@ -23,11 +30,9 @@
      Tambahkan baris baru di sini kalau ada ikon lain yang belum tertangani.
   --------------------------------------------------------------------------- */
   var LABEL_BY_ID = {
-    btnMaster : 'Buka Master setup',
-    btnRefresh: 'Hitung ulang seluruh model',
-    btnImport : 'Impor submission dari Excel',
-    btnExport : 'Ekspor data',
-    btnPrint  : 'Cetak lembar ini'
+    impCheck : 'Periksa data yang ditempel',
+    impGo    : 'Muat data ke dashboard'
+    /* Tambahkan id tombol lain di sini kalau ada ikon yang belum tertangani. */
   };
 
   var LABEL_BY_GLYPH = {
@@ -149,8 +154,9 @@
   }
 
   function backdropAriaHidden(state) {
-    var bg = d.querySelectorAll('.chrome, .sheetwrap, .tabbar');
+    var bg = [mount(), d.querySelector('.skiplink')];
     for (var i = 0; i < bg.length; i++) {
+      if (!bg[i]) continue;
       if (state) bg[i].setAttribute('aria-hidden', 'true');
       else       bg[i].removeAttribute('aria-hidden');
     }
@@ -261,11 +267,56 @@
     }
   }
 
+  /* v1.3 — PERBAIKAN BUG.
+     v1.1 menghapus skeleton tanpa syarat. Kalau boot() gagal, halaman jadi
+     benar-benar kosong dan tidak ada petunjuk apa pun. Sekarang skeleton hanya
+     dihapus kalau #sheets sudah berisi sesuatu selain skeleton itu sendiri. */
   function skeletonDone() {
-    var sk = d.querySelector('.skel-wrap');
-    if (sk && sk.parentNode) sk.parentNode.removeChild(sk);
+    var sheets = mount();
+    if (!sheets) return;
+
+    var sk = sheets.querySelector('.skel-wrap');
+    if (!sk) return;
+
+    var kids = sheets.children, other = 0;
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i] !== sk && !kids[i].classList.contains('skel-wrap')) other++;
+    }
+    if (!other) return;                       /* boot() belum merender apa pun */
+
+    sk.parentNode.removeChild(sk);
     var live = d.getElementById('bootStatus');
     if (live) live.textContent = 'Workbook siap.';
+  }
+
+  /* Pengawas: kalau setelah 4 detik #sheets masih hanya berisi skeleton,
+     boot() hampir pasti gagal. Tampilkan diagnosis, jangan diamkan. */
+  function bootWatchdog() {
+    w.setTimeout(function () {
+      var sheets = mount();
+      if (!sheets) return;
+
+      var kids = sheets.children, other = 0;
+      for (var i = 0; i < kids.length; i++) {
+        if (!kids[i].classList.contains('skel-wrap')) other++;
+      }
+      if (other) return;                      /* aman, sudah terender */
+
+      var globals = [];
+      for (var k in w) { if (/^WVI/.test(k)) globals.push(k); }
+
+      var box = d.createElement('div');
+      box.className = 'bootfail noprint';
+      box.innerHTML =
+        '<b>boot() tidak selesai.</b>' +
+        '<p>Kerangka halaman termuat, tapi app.js berhenti sebelum merender lembar. ' +
+        'Buka DevTools \u2192 Console untuk melihat pesan error yang pertama.</p>' +
+        '<p>Global data yang berhasil terbaca (' + globals.length + '): ' +
+        (globals.length ? '<code>' + globals.join('</code> <code>') + '</code>'
+                        : '<i>tidak ada satu pun</i> \u2014 periksa path di tag &lt;script&gt;') +
+        '</p>';
+      sheets.appendChild(box);
+    }, 4000);
   }
 
   /* ---------------------------------------------------------------------------
@@ -277,6 +328,7 @@
     sweepQueued = false;
     tipify(d);
     labelButtons(d);
+    skeletonDone();
 
     var scrims = d.querySelectorAll('.scrim');
     for (var i = 0; i < scrims.length; i++) {
@@ -297,7 +349,7 @@
   function start() {
     skeletonAnnounce();
     sweep();
-    skeletonDone();
+    bootWatchdog();
 
     new MutationObserver(queueSweep).observe(d.body, {
       childList : true,
@@ -312,10 +364,12 @@
 
   /* Diekspos supaya bisa dipanggil manual dari konsol atau dari boot(). */
   w.WVIA11Y = {
+    mount       : mount,
     sweep       : sweep,
     tipify      : tipify,
     labelButtons: labelButtons,
     skeletonDone: skeletonDone,
+    bootWatchdog: bootWatchdog,
     LABEL_BY_ID : LABEL_BY_ID,
     LABEL_BY_GLYPH: LABEL_BY_GLYPH
   };
