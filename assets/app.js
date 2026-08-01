@@ -128,6 +128,8 @@ function checks(){
   const dupeRows=S.rows.filter(r=>r._dupe).length;
   const total=ST_IND.reduce((a,s)=>a+S.rows.filter(r=>r._status===s.v).length,0);
   const oor=S.rows.filter(r=>Math.abs(N(r.Pct_Base))>1||Math.abs(N(r.Pct_LOP))>1).length;
+  const nd=S.rows.filter(r=>(N(r.Den_Base)>0&&N(r.Num_Base)>N(r.Den_Base))||
+                            (N(r.Den_LOP)>0&&N(r.Num_LOP)>N(r.Den_LOP))).length;
   const unknownAsumsi=S.asumsi.filter(a=>IND_LIST.indexOf(a.ind)<0).length;
   const unknownAP=S.pemetaan.aps.filter(a=>!AP_LIST.some(x=>x.ap===a)).length;
   return {
@@ -137,6 +139,7 @@ function checks(){
     dupe: comboDupe===0 ? "TIDAK ADA DUPLIKAT" : comboDupe+" KOMBINASI AP × INDIKATOR GANDA",
     dupeRows:dupeRows, comboDupe:comboDupe, oor:oor,
     range: oor===0 ? "PROPORSI OK" : oor+" PROPORSI DI LUAR 0–100%",
+    numden: nd===0 ? "NUM ≤ DEN" : nd+" BARIS NUMERATOR > DENOMINATOR", nd:nd,
     unknownAsumsi:unknownAsumsi, unknownAP:unknownAP,
     ok: idDupe===0 && total===n && comboDupe===0 && oor===0 && unknownAsumsi===0 && unknownAP===0
   };
@@ -293,11 +296,13 @@ function chartDiverge(items,opt){
 /* ==========================================================================
    KERANGKA HALAMAN + BAND FILTER
    ========================================================================== */
-const F={ zonal:[], ap:[], outcome:[], status:[], berlaku:"Yes",
+const F={ zonal:[], ap:[], outcome:[], status:[], ind:[], berlaku:"Yes", period:"Both",
   sort:null, sortDir:1, showAll:false, fbOpen:true };
 
 const SHEETS=[
- {id:"SUMMARY", tab:"SUMMARY", c:"#FF5515",
+ {id:"NASIONAL", tab:"NATIONAL SUMMARY", c:"#FF5515",
+  title:"NATIONAL SUMMARY DASHBOARD", render:renderNasional},
+ {id:"SUMMARY", tab:"SUMMARY", c:"#0C7993",
   title:"SUMMARY — SEMUA INDIKATOR", render:renderSummary},
  {id:"ANALISIS", tab:"ANALISIS AP", c:"#111222",
   title:"ANALISIS AP — BASELINE vs ENDLINE (LOP)", render:renderAnalisis},
@@ -306,7 +311,7 @@ const SHEETS=[
  {id:"PEMETAAN", tab:"Pemetaan Indikator", c:"#3F3D4C", cfg:true,
   title:"PEMETAAN INDIKATOR", render:renderPemetaan}
 ];
-let CUR="SUMMARY";
+let CUR="NASIONAL";
 
 function buildFrames(){
   document.getElementById("sheets").innerHTML=SHEETS.map(sh=>
@@ -330,7 +335,7 @@ function crumbLine(){
   return 'Data per <b>'+esc(CFG.data_date)+'</b> &nbsp;·&nbsp; <b>'+n0(c.n)+'</b> baris &nbsp;·&nbsp; <b>'+
     AP_LIST.length+'</b> AP &nbsp;·&nbsp; <b>'+ZONALS.length+'</b> Zonal &nbsp;·&nbsp; '+
     chipOf(c.rowid,c.rowid==="ROW ID OK")+chipOf(c.sinkron,c.sinkron==="SINKRON")+
-    chipOf(c.dupe,c.comboDupe===0)+chipOf(c.range,c.oor===0);
+    chipOf(c.dupe,c.comboDupe===0)+chipOf(c.range,c.oor===0)+chipOf(c.numden,c.nd===0);
 }
 function go(id){
   if(!SHEETS.some(s=>s.id===id))return;
@@ -452,8 +457,7 @@ function renderSummary(){
   const COLS=[["Zonal","Zonal"],["Area Program","Area Program"],["Outcome","Outcome"],["Code","Code"],
     ["Indicator","Indikator"],["Num_Base","Num Base"],["Den_Base","Den Base"],["Pct_Base","% Baseline"],
     ["Num_LOP","Num LOP"],["Den_LOP","Den LOP"],["Pct_LOP","% LOP"],["Delta","Delta"],
-    ["AP_Decision","AP Decision"],["Threshold","Threshold"],["AP_vs_Threshold","AP ≥ Threshold?"],
-    ["Row_ID","Row ID"]];
+    ["Threshold","Threshold"],["Row_ID","Row ID"]];
   const view=sortRows(rows);
   const cap=F.showAll?view.length:Math.min(view.length,150);
 
@@ -477,8 +481,7 @@ function renderSummary(){
       "Delta","Threshold"].indexOf(c[0])>=0)?"r":"")).join('')+
     '</tr></thead><tbody>'+
     view.slice(0,cap).map(r=>{
-      const dec=r.AP_vs_Threshold;
-      return '<tr'+(r._berlaku==="No"?' class="oos"':'')+'>'+
+        return '<tr'+(r._berlaku==="No"?' class="oos"':'')+'>'+
       '<td class="dim">'+esc(r.Zonal)+'</td><td>'+esc(r["Area Program"])+'</td>'+
       '<td class="c dim">'+esc(r.Outcome)+'</td>'+
       '<td class="code'+(isBlank(r.Code)?' miss':'')+'">'+(isBlank(r.Code)?'—':esc(r.Code))+'</td>'+
@@ -489,10 +492,7 @@ function renderSummary(){
       '<td class="'+(N(r.Pct_LOP)===0?"belumcell":"r")+'">'+pctD(r.Pct_LOP)+'</td>'+
       '<td class="r '+(N(r.Delta)>0?"up":N(r.Delta)<0?"down":"dim")+'">'+
         (N(r.Delta)===0?"—":(N(r.Delta)>0?"+":"")+(N(r.Delta)*100).toFixed(1)+"pp")+'</td>'+
-      '<td class="r dim">'+(isBlank(r.AP_Decision)?"—":(typeof r.AP_Decision==="number"?(r.AP_Decision*100).toFixed(0)+"pp":esc(r.AP_Decision)))+'</td>'+
       '<td class="'+(N(r.Threshold)===0?"miss":"r")+'">'+pctT(r.Threshold)+'</td>'+
-      '<td class="'+(dec==="Monitor Indicator"?"moncell":(isBlank(dec)||dec==="0"||dec===0)?"miss":"")+'">'+
-        ((isBlank(dec)||dec==="0"||dec===0)?"belum diisi":esc(dec))+'</td>'+
       '<td class="code dim'+(r._iddupe?' miss':'')+'">'+esc(r.Row_ID)+'</td></tr>';
     }).join('')+
     '</tbody></table></div>'+
@@ -500,6 +500,255 @@ function renderSummary(){
     n0(view.length)+' baris</button></div>':'')+
   '<p class="tcap">Sel merah = nilai <b>0</b>, yang menurut konvensi PEARL berarti <b>belum ada data</b>. '+
    'Baris abu-abu miring: <b>Berlaku = No</b>.</p>';
+}
+/* ==========================================================================
+   HALAMAN 1 — NATIONAL SUMMARY DASHBOARD
+   --------------------------------------------------------------------------
+   Metode: Weighted National (%) = Σ Numerator ÷ Σ Denominator.
+   Numerator dijumlahkan dulu, denominator dijumlahkan dulu, baru dibagi.
+   TIDAK ADA rata-rata persentase antar AP atau antar zona.
+
+   Konsekuensi yang perlu diingat: sebuah baris hanya bisa masuk hitungan
+   kalau denominatornya ada. Baris yang punya % tapi tidak punya denominator
+   tidak bisa diberi bobot, jadi ia dikeluarkan — dan jumlahnya dilaporkan.
+
+   Tidak ada total lintas indikator. Menjumlahkan numerator dua indikator yang
+   populasinya berbeda menghasilkan angka tanpa makna (di dataset ini hasilnya
+   116,9%). Angka nasional hanya sah per indikator.
+   ========================================================================== */
+const PERIODS=["Baseline","Evaluation","Both"];
+
+function weightedOf(rows){
+  let nB=0,dB=0,nE=0,dE=0,skipB=0,skipE=0;
+  const apB={}, apE={};
+  rows.forEach(r=>{
+    const db=N(r.Den_Base), dl=N(r.Den_LOP);
+    if(db>0){ nB+=N(r.Num_Base); dB+=db; apB[r["Area Program"]]=1; }
+    else if(N(r.Pct_Base)>0) skipB++;
+    if(dl>0){ nE+=N(r.Num_LOP); dE+=dl; apE[r["Area Program"]]=1; }
+    else if(N(r.Pct_LOP)>0) skipE++;
+  });
+  const pB=dB>0?nB/dB:null, pE=dE>0?nE/dE:null;
+  return {nB:nB,dB:dB,nE:nE,dE:dE,pB:pB,pE:pE,
+    apB:Object.keys(apB).length, apE:Object.keys(apE).length,
+    skipB:skipB, skipE:skipE,
+    delta:(pB!==null&&pE!==null)?(pE-pB):null};
+}
+function natRows(){
+  let rows=S.rows;
+  if(F.zonal.length)   rows=rows.filter(r=>F.zonal.indexOf(r.Zonal)>=0);
+  if(F.ap.length)      rows=rows.filter(r=>F.ap.indexOf(r["Area Program"])>=0);
+  if(F.outcome.length) rows=rows.filter(r=>F.outcome.indexOf(r.Outcome)>=0);
+  if(F.ind.length)     rows=rows.filter(r=>F.ind.indexOf(r.Indicator)>=0);
+  return rows;
+}
+const showB = () => F.period!=="Evaluation";
+const showE = () => F.period!=="Baseline";
+
+function renderNasional(){
+  const pc=v=>v===null?"—":(v*100).toFixed(1)+"%";
+  const pp=v=>v===null?"—":(v>0?"+":"")+(v*100).toFixed(1);
+  const rows=natRows();
+  const per=S.cat.map(c=>{
+    const rs=rows.filter(r=>r.Indicator===c.ind);
+    return {ind:c.ind, short:c.short, code:c.code, oc:c.oc,
+      dir:arahOf(c.ind), w:weightedOf(rs), n:rs.length};
+  }).filter(x=>x.n>0);
+
+  const withB=per.filter(x=>x.w.pB!==null), withE=per.filter(x=>x.w.pE!==null);
+  const withBoth=per.filter(x=>x.w.delta!==null);
+  const BAND=0.001;                                  /* 0,1pp dianggap tetap */
+  const naik=withBoth.filter(x=>x.w.delta>BAND).length;
+  const turun=withBoth.filter(x=>x.w.delta<-BAND).length;
+  const tetap=withBoth.length-naik-turun;
+  const skipB=per.reduce((a,x)=>a+x.w.skipB,0), skipE=per.reduce((a,x)=>a+x.w.skipE,0);
+  /* weighted di luar 0–100% berarti Σnumerator melebihi Σdenominator — mustahil
+     untuk sebuah proporsi, jadi ini masalah input, bukan hasil. */
+  const oorInd=per.filter(x=>(x.w.pB!==null&&x.w.pB>1)||(x.w.pE!==null&&x.w.pE>1));
+  const oorRows=rows.filter(r=>(N(r.Den_Base)>0&&N(r.Num_Base)>N(r.Den_Base))||
+                               (N(r.Den_LOP)>0&&N(r.Num_LOP)>N(r.Den_LOP)));
+  const oorAP={}; oorRows.forEach(r=>{oorAP[r["Area Program"]]=(oorAP[r["Area Program"]]||0)+1;});
+  const oorTop=Object.keys(oorAP).sort((a,b)=>oorAP[b]-oorAP[a]);
+
+
+  /* ---------- grafik ---------- */
+  const cmp=per.filter(x=>x.w.pB!==null||x.w.pE!==null)
+    .map(x=>({label:x.short+(x.dir==="Turun"?" ↓":""),
+      a:showB()?x.w.pB:null, b:showE()?x.w.pE:null}));
+  const del=withBoth.slice().sort((a,b)=>b.w.delta-a.w.delta)
+    .map(x=>({label:x.short+(x.dir==="Turun"?" ↓":""), v:x.w.delta}));
+
+  return '<div class="notice">Seluruh angka nasional dihitung <b>Σ Numerator ÷ Σ Denominator</b>: '+
+    'numerator dijumlahkan dulu, denominator dijumlahkan dulu, baru dibagi. '+
+    'Tidak ada rata-rata persentase antar AP atau antar zona. '+
+    '<b>Tidak ada total lintas indikator</b> — menjumlahkan populasi dua indikator yang berbeda '+
+    'menghasilkan angka tanpa makna, jadi angka nasional hanya sah per indikator.</div>'+
+
+  natFilterBand()+
+
+  '<div class="slabel">Cakupan dataset'+natActiveLine()+'</div>'+
+  '<div class="cards">'+
+    card("Total<br>AP",uniq(rows.map(r=>r["Area Program"])).length,"","teal")+
+    card("Total<br>Zonal",uniq(rows.map(r=>r.Zonal)).length,"","neutral")+
+    card("Total<br>Outcome",uniq(rows.map(r=>r.Outcome).filter(Boolean)).length,"","neutral")+
+    card("Total<br>Indicators",per.length,"dari "+S.cat.length+" di katalog","accent")+
+  '</div>'+
+
+  '<div class="slabel">Ringkasan arah perubahan '+
+    '<span class="hint">'+withBoth.length+' indikator punya baseline dan evaluation berbobot</span></div>'+
+  '<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">'+
+    card("Meningkat",naik,"delta &gt; +0,1pp","ready")+
+    card("Tetap",tetap,"|delta| ≤ 0,1pp","belum")+
+    card("Menurun",turun,"delta &lt; −0,1pp","critical")+
+    card("Belum bisa<br>dibandingkan",per.length-withBoth.length,
+      "baseline atau evaluation belum berbobot","review")+
+  '</div>'+
+  ((skipB+skipE)?'<p class="chartnote">'+n0(skipB+skipE)+' baris punya persentase tetapi tidak punya '+
+    'denominator, jadi tidak bisa diberi bobot dan dikeluarkan dari hitungan nasional '+
+    '('+skipB+' baseline, '+skipE+' evaluation).</p>':'')+
+
+  (oorInd.length?
+  '<div class="warnbox" style="margin-top:18px"><b>'+oorInd.length+' indikator menghasilkan '+
+   'weighted di luar 0–100%</b>, artinya Σ numerator melebihi Σ denominator. Itu mustahil untuk '+
+   'sebuah proporsi, jadi angkanya <b>tidak boleh dikutip</b> sebelum sumbernya diperbaiki. '+
+   'Penyebabnya ada di <b>'+n0(oorRows.length)+' baris</b>'+
+   (oorTop.length?', terbanyak di <b>'+esc(oorTop[0])+'</b> ('+oorAP[oorTop[0]]+' baris)'+
+     (oorTop[1]?' dan '+esc(oorTop[1])+' ('+oorAP[oorTop[1]]+')':''):'')+'. '+
+   'Metode weighted-lah yang memunculkannya — rata-rata persentase akan menyembunyikannya.</div>'+
+  '<div class="tscroll" style="margin-top:10px"><table class="gt tight"><thead><tr>'+
+    '<th>Indicator</th><th class="r">Σ Num Base</th><th class="r">Σ Den Base</th><th class="r">Baseline</th>'+
+    '<th class="r">Σ Num Eval</th><th class="r">Σ Den Eval</th><th class="r">Evaluation</th>'+
+    '</tr></thead><tbody>'+oorInd.map(x=>'<tr>'+
+      '<td class="ind" title="'+esc(x.ind)+'">'+esc(x.short)+'</td>'+
+      '<td class="r dim">'+n0(x.w.dB?x.w.nB:null)+'</td><td class="r dim">'+n0(x.w.dB||null)+'</td>'+
+      '<td class="'+(x.w.pB!==null&&x.w.pB>1?"miss":"r")+'">'+pc(x.w.pB)+'</td>'+
+      '<td class="r dim">'+n0(x.w.dE?x.w.nE:null)+'</td><td class="r dim">'+n0(x.w.dE||null)+'</td>'+
+      '<td class="'+(x.w.pE!==null&&x.w.pE>1?"miss":"r")+'">'+pc(x.w.pE)+'</td></tr>').join('')+
+    '</tbody></table></div>':'')+
+
+  '<div class="slabel">Baseline vs Evaluation per indikator '+
+    '<span class="hint">Weighted National (%)</span></div>'+
+  '<div class="chartbox">'+
+    (cmp.length?chartPair(cmp,["Baseline",CLR.baseline],["Evaluation",CLR.endline],{labW:250})
+      :'<p class="dim">Tidak ada indikator dengan denominator pada filter ini.</p>')+
+    legend([["Baseline",CLR.baseline]].concat(showE()?[["Evaluation",CLR.endline]]:[]))+
+    '<p class="chartnote">↓ menandai indikator berarah Turun — pada indikator itu penurunan '+
+    'justru perbaikan.</p></div>'+
+
+  (F.period==="Both"?
+  '<div class="slabel">Delta per indikator <span class="hint">poin persentase · '+
+    'peningkatan terbesar di atas</span></div>'+
+  '<div class="chartbox">'+
+    (del.length?chartDelta(del,{labW:250}):'<p class="dim">Belum ada indikator yang punya keduanya.</p>')+
+    '<div class="legend">'+
+      '<div><i style="background:'+CLR.baik+';border-color:'+CLR.baik+'"></i>Meningkat</div>'+
+      '<div><i style="background:'+CLR.belum+';border-color:'+CLR.ref+'"></i>Tetap</div>'+
+      '<div><i style="background:'+CLR.hati+';border-color:'+CLR.hati+'"></i>Menurun</div>'+
+    '</div>'+
+    '<p class="chartnote">Warna mengikuti arah angka, bukan arah perbaikan: pada indikator '+
+    'bertanda ↓ warna merah berarti angkanya turun, dan itu <b>hasil yang baik</b>.</p></div>':'')+
+
+  '<div class="slabel">National Summary Table <span class="hint">'+per.length+' indikator</span></div>'+
+  '<div class="tscroll"><table class="gt tight"><thead><tr>'+
+    '<th>Outcome</th><th>Indicator</th>'+
+    (showB()?'<th class="r">Base Num</th><th class="r">Base Den</th><th class="r">Baseline (%)</th><th class="r">AP</th>':'')+
+    (showE()?'<th class="r">Eval Num</th><th class="r">Eval Den</th><th class="r">Evaluation (%)</th><th class="r">AP</th>':'')+
+    (F.period==="Both"?'<th class="r">Delta (pp)</th>':'')+
+    '</tr></thead><tbody>'+
+    per.map(x=>'<tr><td class="c dim">'+esc(x.oc||"—")+'</td>'+
+      '<td class="ind" title="'+esc(x.ind)+'">'+esc(x.short)+
+        (x.dir==="Turun"?' <span class="turun">↓</span>':'')+'</td>'+
+      (showB()?'<td class="r dim">'+n0(x.w.dB?x.w.nB:null)+'</td><td class="r dim">'+n0(x.w.dB||null)+'</td>'+
+        '<td class="'+(x.w.pB===null||x.w.pB>1?"miss":"r")+'"><b>'+pc(x.w.pB)+'</b>'+
+        (x.w.pB!==null&&x.w.pB>1?' ▲':'')+'</td>'+
+        '<td class="r dim">'+(x.w.apB||"—")+'</td>':'')+
+      (showE()?'<td class="r dim">'+n0(x.w.dE?x.w.nE:null)+'</td><td class="r dim">'+n0(x.w.dE||null)+'</td>'+
+        '<td class="'+(x.w.pE===null||x.w.pE>1?"miss":"r")+'"><b>'+pc(x.w.pE)+'</b>'+
+        (x.w.pE!==null&&x.w.pE>1?' ▲':'')+'</td>'+
+        '<td class="r dim">'+(x.w.apE||"—")+'</td>':'')+
+      (F.period==="Both"?'<td class="r '+(x.w.delta===null?"dim":x.w.delta>0.001?"up":x.w.delta<-0.001?"down":"dim")+'">'+
+        pp(x.w.delta)+'</td>':'')+
+      '</tr>').join('')+
+    '</tbody></table></div>'+
+  '<p class="tcap">Kolom <b>AP</b> adalah jumlah Area Program yang benar-benar menyumbang angka itu. '+
+   'Angka nasional yang hanya berasal dari satu atau dua AP tetap ditampilkan, tapi jangan dibaca '+
+   'sebagai gambaran nasional.</p>';
+}
+
+/* ---------- band filter khusus halaman nasional ---------- */
+function natFilterBand(){
+  const all=S.rows;
+  const apPool=F.zonal.length?AP_LIST.filter(a=>F.zonal.indexOf(a.zonal)>=0):AP_LIST;
+  const indPool=S.cat.filter(c=>!F.outcome.length||F.outcome.indexOf(c.oc)>=0);
+  const nAktif=F.zonal.length+F.ap.length+F.outcome.length+F.ind.length+(F.period!=="Both"?1:0);
+
+  let h='<div class="fb"><div class="fb-head">'+
+    '<span class="fb-title">Filter</span>'+
+    '<span class="fb-sum">'+(nAktif?esc(natActiveText()):'seluruh dataset')+'</span>'+
+    '<div class="fb-sp"></div>'+
+    (nAktif?'<button class="fb-btn" data-act="natReset">Bersihkan semua</button>':'')+
+    (F.fbOpen?'<button class="fb-btn" data-act="fbClose">Sembunyikan ▴</button>'
+             :'<button class="fb-btn" data-act="fbOpen">Ubah filter ▾</button>')+
+    '</div>';
+  if(!F.fbOpen) return h+'</div>';
+  h+='<div class="fb-row"><div class="fb-lab">Periode</div><div class="fb-chips">'+
+      PERIODS.map(p=>'<button class="chipf big'+(F.period===p?" sel":"")+
+        '" data-slice="period" data-val="'+p+'">'+
+        (F.period===p?"◉ ":"○ ")+p+(p==="Both"?' <span class="n">default</span>':'')+
+        '</button>').join('')+
+     '</div></div>'+
+    fbRow("Zonal","zonal",ZONALS.map(z=>({v:z,n:all.filter(r=>r.Zonal===z).length})),true)+
+    fbRow("Area Program","ap",apPool.map(a=>({v:a.ap,n:all.filter(r=>r["Area Program"]===a.ap).length})),true,
+      F.zonal.length?'mengikuti Zonal yang dipilih':'')+
+    fbRow("Outcome","outcome",OUTCOMES.map(o=>({v:o,n:all.filter(r=>r.Outcome===o).length})),true)+
+    '<div class="fb-row"><div class="fb-lab">Indicator'+
+      (F.ind.length?'<button class="fb-x" data-clear="ind" title="Bersihkan">×</button>':'')+
+      '</div><div class="fb-chips">'+
+      indPool.map(c=>'<button class="chipf'+(F.ind.indexOf(c.ind)>=0?" sel":"")+
+        '" data-slice="ind" data-val="'+esc(c.ind)+'" title="'+esc(c.ind)+'">'+esc(c.short)+'</button>').join('')+
+      (F.outcome.length?'<span class="fb-hint">mengikuti Outcome yang dipilih</span>':'')+
+    '</div></div>'+
+  '</div>';
+  return h;
+}
+function natActiveText(){
+  const b=[];
+  if(F.period!=="Both") b.push(F.period);
+  if(F.zonal.length) b.push(F.zonal.join(", "));
+  if(F.ap.length) b.push(F.ap.length===1?F.ap[0]:F.ap.length+" AP");
+  if(F.outcome.length) b.push(F.outcome.join(", "));
+  if(F.ind.length) b.push(F.ind.length+" indikator");
+  return b.join(" · ");
+}
+function natActiveLine(){
+  const s=natActiveText();
+  return s?' <span class="hint">'+esc(s)+'</span>':'';
+}
+
+/* ---------- bar delta: hijau naik, abu tetap, merah turun ---------- */
+function chartDelta(items,opt){
+  opt=opt||{};
+  const labW=opt.labW||250, W=700, BH=13, PITCH=BH+9;
+  const H=Math.max(34,items.length*PITCH+24), PW=W-labW-76;
+  const m=Math.max(0.02,...items.map(i=>Math.abs(i.v||0)));
+  const sc=Math.ceil(m*20)/20, zero=labW+PW/2, half=PW/2;
+  const x=v=>zero+half*Math.max(-1,Math.min(1,(v||0)/sc));
+  let s='<svg viewBox="0 0 '+W+' '+H+'" role="img">';
+  s+='<line x1="'+zero+'" y1="14" x2="'+zero+'" y2="'+(H-10)+'" stroke="#3F3D4C" stroke-width="1.2"/>'+
+     '<text x="'+zero+'" y="9" text-anchor="middle" font-size="8" fill="#3F3D4C">0</text>'+
+     '<text x="'+labW+'" y="9" font-size="8" fill="#A9A6B0">−'+(sc*100).toFixed(0)+'pp</text>'+
+     '<text x="'+(labW+PW)+'" y="9" text-anchor="end" font-size="8" fill="#A9A6B0">+'+(sc*100).toFixed(0)+'pp</text>';
+  items.forEach((it,i)=>{
+    const y=i*PITCH+16, xv=x(it.v);
+    const col = it.v>0.001?CLR.baik : it.v<-0.001?CLR.hati : CLR.belum;
+    s+='<text x="'+(labW-8)+'" y="'+(y+BH-3)+'" text-anchor="end" font-size="9.5" font-weight="600" fill="#111222">'+
+       esc(it.label)+'</text>'+
+       '<rect x="'+Math.min(zero,xv).toFixed(1)+'" y="'+y+'" width="'+Math.abs(xv-zero).toFixed(1)+
+       '" height="'+BH+'" fill="'+col+'"'+(col===CLR.belum?' stroke="'+CLR.ref+'" stroke-width=".6"':'')+'/>'+
+       '<text x="'+(labW+PW+8)+'" y="'+(y+BH-3)+'" font-size="9.5" font-weight="700" fill="'+
+       (col===CLR.belum?CLR.ref:col)+'">'+(it.v>0?"+":"")+(it.v*100).toFixed(1)+'pp</text>';
+  });
+  return s+'</svg>';
 }
 /* ==========================================================================
    IMPOR DARI EXCEL
@@ -513,8 +762,7 @@ function renderSummary(){
    terbaca benar.
    ========================================================================== */
 const IMP_COLS=["Zonal","Area Program","Outcome","Code","Indicator","Num_Base","Den_Base",
-  "Pct_Base","Num_LOP","Den_LOP","Pct_LOP","Delta","AP_Decision","Threshold",
-  "AP_vs_Threshold","Delta_LOP_Base","Row_ID"];
+  "Pct_Base","Num_LOP","Den_LOP","Pct_LOP","Delta","Threshold","Delta_LOP_Base","Row_ID"];
 const IMP_KIND={Num_Base:"count",Den_Base:"count",Num_LOP:"count",Den_LOP:"count",
   Pct_Base:"prop",Pct_LOP:"prop",Delta:"prop",AP_Decision:"prop",Threshold:"prop",
   Delta_LOP_Base:"prop"};
@@ -526,7 +774,7 @@ const IMP_KIND={Num_Base:"count",Den_Base:"count",Num_LOP:"count",Den_LOP:"count
    per sel. Kalau blok tidak memberi petunjuk, dipakai titik. */
 let DECSEP=".";
 function detectDecSep(lines,start){
-  const PROP=[7,10,11,12,13,15];
+  const PROP=[7,10,11,12,13];
   let dot=0, com=0;
   for(let i=start;i<lines.length;i++){
     const c=lines[i].split("\t");
@@ -956,7 +1204,9 @@ function wire(id,el){
   el.querySelectorAll("[data-slice]").forEach(b=>b.onclick=()=>{
     const f=b.dataset.slice, v=b.dataset.val;
     if(f==="berlaku") F.berlaku=v;
+    else if(f==="period") F.period=v;
     else { const i=F[f].indexOf(v); i>=0?F[f].splice(i,1):F[f].push(v); }
+    if(f==="outcome"&&F.outcome.length) F.ind=F.ind.filter(x=>F.outcome.indexOf((CAT_BY_IND[x]||{}).oc)>=0);
     if(f==="zonal"&&F.zonal.length) F.ap=F.ap.filter(ap=>F.zonal.indexOf(S.apz[ap])>=0);
     F.showAll=false; paint(id);
   });
@@ -983,6 +1233,7 @@ function act(b,id){
   if(a==="fbOpen"){ F.fbOpen=true; paint(id); return; }
   if(a==="fbClose"){ F.fbOpen=false; paint(id); return; }
   if(a==="fbReset"){ F.zonal=[];F.ap=[];F.outcome=[];F.status=[];F.berlaku="Yes";F.showAll=false; paint(id); return; }
+  if(a==="natReset"){ F.zonal=[];F.ap=[];F.outcome=[];F.ind=[];F.period="Both"; paint(id); return; }
   if(a==="delAsumsi"){
     const g=S.asumsi.splice(+b.dataset.i,1)[0];
     recompute(); saveLocal(); paint(id);
@@ -1164,6 +1415,6 @@ function open2(){
   document.addEventListener("keydown",ev=>{
     if(ev.key==="Escape") document.querySelectorAll(".scrim.on").forEach(s=>s.classList.remove("on"));});
   on("btnReset",()=>{clearLocal();location.reload();});
-  go("SUMMARY");
+  go("NASIONAL");
 }
 document.addEventListener("DOMContentLoaded",boot);
