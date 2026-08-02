@@ -1479,8 +1479,8 @@ function chHBar(items){
     const tip=it.label+' \u00B7 Baseline '+(it.a==null?"belum ada data":pc0(it.a))+
               ' \u00B7 Evaluation '+(it.b==null?"belum ada data":pc0(it.b));
     s+='<g class="chr" style="--i:'+i+'" data-tip="'+esc(tip)+'">'+
-       '<rect class="chit" x="0" y="'+(y-8)+'" width="'+W+'" height="'+(P-2)+'"/>'+
-       '<rect class="ctrk" x="'+LW+'" y="'+y+'" width="'+PW+'" height="'+(BH*2+GAP)+'" rx="3"/>'+
+       '<rect class="chit" fill="none" pointer-events="all" x="0" y="'+(y-8)+'" width="'+W+'" height="'+(P-2)+'"/>'+
+       '<rect class="ctrk" fill="#F4F6F9" x="'+LW+'" y="'+y+'" width="'+PW+'" height="'+(BH*2+GAP)+'" rx="3"/>'+
        svgWrap(it.label,0,y+BH+1,40,2,11.5,CL.ink)+
        '<rect x="'+LW+'" y="'+y+'" width="'+wb.toFixed(1)+'" height="'+BH+'" rx="3" fill="'+CL.blue+'" opacity=".85"/>'+
        '<rect x="'+LW+'" y="'+(y+BH+GAP)+'" width="'+we.toFixed(1)+'" height="'+BH+'" rx="3" fill="'+CL.brand+'"/>'+
@@ -1502,7 +1502,7 @@ function chBullet(items){
               (it.thr==null?"":' \u00B7 Threshold '+pc0(it.thr)+
                ' \u00B7 '+(it.meets?"tercapai":"belum tercapai"));
     s+='<g class="chr" style="--i:'+i+'" data-tip="'+esc(tip)+'">'+
-       '<rect class="chit" x="0" y="'+(y-6)+'" width="'+W+'" height="'+(P-2)+'"/>';
+       '<rect class="chit" fill="none" pointer-events="all" x="0" y="'+(y-6)+'" width="'+W+'" height="'+(P-2)+'"/>';
     s+=svgWrap(it.label,0,y+BH/2,40,2,11.5,CL.ink);
     s+='<rect x="'+LW+'" y="'+y+'" width="'+PW+'" height="'+BH+'" rx="3" fill="#F4F6F9"/>';
     if(it.thr!=null){
@@ -1543,7 +1543,7 @@ function chDiverge(items){
     const col=it.v>.001?CL.ok:it.v<-.001?CL.bad:CL.ink4;
     const tip=it.label+' \u00B7 Delta '+((it.v>0?"+":"")+(it.v*100).toFixed(1))+' poin persentase';
     s+='<g class="chr" style="--i:'+i+'" data-tip="'+esc(tip)+'">'+
-       '<rect class="chit" x="0" y="'+(y-8)+'" width="'+W+'" height="'+(P-2)+'"/>'+
+       '<rect class="chit" fill="none" pointer-events="all" x="0" y="'+(y-8)+'" width="'+W+'" height="'+(P-2)+'"/>'+
        svgWrap(it.label,0,y+BH/2,40,2,11.5,CL.ink)+
        '<rect x="'+Math.min(z,xv).toFixed(1)+'" y="'+y+'" width="'+Math.abs(xv-z).toFixed(1)+
        '" height="'+BH+'" rx="2" fill="'+col+'"/>'+
@@ -1680,7 +1680,6 @@ function renderDash(){
 
   const top=withBoth.slice().sort((a,b)=>b.w.delta-a.w.delta).slice(0,10);
   const bot=withBoth.slice().sort((a,b)=>a.w.delta-b.w.delta).slice(0,10);
-  const attn=per.filter(x=>x.meets===false).sort((a,b)=>(a.ach||0)-(b.ach||0));
 
   const K=(ic,tone,lab,val,sub)=>'<div class="c3"><div class="kpi click" data-kpi="'+lab+'">'+
     '<div class="kpi-top"><span class="kpi-ic '+tone+'">'+ic+'</span><span class="kpi-lab">'+lab+'</span></div>'+
@@ -1733,27 +1732,6 @@ function renderDash(){
       tbl(top,"up"))+'</div>'+
     '<div class="c6">'+xcard("bot","Lowest Performing Indicators","Penurunan terbesar dibanding baseline",
       tbl(bot,"down"))+'</div>'+
-
-    
-
-    '<div class="c12">'+xcard("attn","Indicators Requiring Attention",
-      attn.length+" indikator masih di bawah threshold",
-      attn.length?'<div class="tscroll"><table class="tb"><thead><tr><th>Indicator</th><th>Outcome</th>'+
-        '<th class="r">Evaluation</th><th class="r">Threshold</th><th class="r">Gap (pp)</th>'+
-        '<th class="r">Capaian</th><th>Status</th></tr></thead><tbody>'+
-        attn.map(x=>{
-          const gap=x.dir===-1?(x.w.pE-x.thr):(x.thr-x.w.pE);
-          const a=x.ach===null?null:x.ach*100;
-          return '<tr><td class="nm">'+esc(x.short)+(x.dir===-1?' <span class="dim">↓</span>':'')+'</td>'+
-          '<td class="dim">'+esc(x.oc||"—")+'</td>'+
-          '<td class="r">'+pc1(x.w.pE)+'</td><td class="r dim">'+pc1(x.thr)+'</td>'+
-          '<td class="r xdown">'+(gap*100).toFixed(1)+'</td>'+
-          '<td class="r">'+(a===null?"—":a.toFixed(0)+"%")+'</td>'+
-          '<td>'+(a===null?'<span class="ppill p-gray"><span class="dt"></span>Belum ada data</span>'
-            :a>=75?'<span class="ppill p-warn"><span class="dt"></span>Mendekati</span>'
-            :'<span class="ppill p-bad"><span class="dt"></span>Perlu perhatian</span>')+'</td></tr>';
-        }).join('')+'</tbody></table></div>'
-        :'<div class="xempty">Semua indikator pada filter ini sudah mencapai threshold.</div>')+'</div>'+
   '</div>';
 }
 function tbl(list,dir){
