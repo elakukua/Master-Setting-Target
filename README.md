@@ -158,4 +158,52 @@ folder `data/` bisa dibaca langsung di GitHub tanpa melewati layar itu.
 
 ---
 
-Versi `v3.1` · 1 Agustus 2026 · data dari Master (9), pembaca CSV untuk pipeline Power Automate.
+Versi `v3.2` · 2 Agustus 2026 · data dari Master (9), pembaca CSV untuk pipeline Power Automate.
+
+---
+
+## Struktur berkas (v3.2)
+
+```
+index.html
+.nojekyll
+README.md
+
+assets/
+  app.js              engine, render seluruh sheet
+  app.css             design token system
+  a11y-patch.css      kontras WCAG AA, ukuran font minimum, tooltip, skeleton
+  a11y-patch.js       aria-label, focus trap modal, pengawas boot
+
+data/
+  config.js           dibaca app.js
+  indicators.js       dibaca app.js
+  asumsi.js           dibaca app.js
+  pemetaan.js         dibaca app.js
+  master.js           ARSIP SUMBER, tidak dibaca app.js
+  ap-register.js      ARSIP SUMBER, tidak dibaca app.js
+  decisions.js        ARSIP SUMBER, tidak dibaca app.js
+```
+
+### Tentang tiga berkas arsip
+
+`app.js` hanya merujuk empat global: `WVI_CONFIG`, `WVI_INDICATORS`, `WVI_ASUMSI`,
+dan `WVI_PEMETAAN`. Tiga berkas lain tetap disimpan karena memuat jejak asal angka
+— `master.js` adalah 394 baris submission per Area Programme, `decisions.js` adalah
+log keputusan — tapi dashboard tidak membacanya.
+
+**Mengedit ketiga berkas itu tidak akan mengubah tampilan dashboard.** Perubahan
+harus diregenerasi ke `indicators.js` lewat sheet **Reports → Berkas untuk
+repository**, lalu berkas hasilnya di-commit ke `data/`.
+
+### Perubahan di v3.2
+
+- `analysis`, `mapping`, dan `assumptions` dihapus dari array `SHEETS`
+- kartu `Executive Insights` dihapus dari Dashboard
+- `Evaluation vs Threshold` dan `Delta per Indicator` melebar ke `c12`
+- `Top Performing` dan `Lowest Performing` dipindah berdampingan setelah Delta
+- helper `svgWrap()` baru: label chart rata kiri, wrap dua baris, diambil dari teks
+  indikator penuh alih-alih `short` yang sudah dipangkas `…` di `data/config.js`.
+  Versi lama memakai `text-anchor="end"` sehingga label panjang terpotong di tepi
+  kiri viewBox
+- `a11y-patch.css` dan `a11y-patch.js` ditambahkan
