@@ -7,14 +7,14 @@
 <meta name="description" content="National Target Dashboard — Indonesia National Summary. AIM+ Target Setting FY27–FY30, Wahana Visi Indonesia.">
 <meta name="color-scheme" content="light">
 
-<link rel="stylesheet" href="assets/app.css"
-      onerror="var l=document.createElement('link');l.rel='stylesheet';l.href='app.css';document.head.appendChild(l);">
+<link rel="stylesheet" href="assets/app.css?v=3.4"
+      onerror="var l=document.createElement('link');l.rel='stylesheet';l.href='app.css?v=3.4';document.head.appendChild(l);">
 
 <!-- Patch aksesibilitas. Harus SETELAH app.css supaya menang di cascade.
      Pola fallback path-nya sama seperti di atas. Hapus baris ini untuk
      membatalkan seluruh perubahan warna, font, dan tooltip. -->
-<link rel="stylesheet" href="assets/a11y-patch.css"
-      onerror="var l=document.createElement('link');l.rel='stylesheet';l.href='a11y-patch.css';document.head.appendChild(l);">
+<link rel="stylesheet" href="assets/a11y-patch.css?v=3.4"
+      onerror="var l=document.createElement('link');l.rel='stylesheet';l.href='a11y-patch.css?v=3.4';document.head.appendChild(l);">
 
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23FF5515'/%3E%3Crect x='7' y='19' width='4' height='7' rx='1' fill='white'/%3E%3Crect x='14' y='13' width='4' height='13' rx='1' fill='white'/%3E%3Crect x='21' y='7' width='4' height='19' rx='1' fill='white'/%3E%3C/svg%3E">
@@ -77,6 +77,11 @@
 (function(){
   /* Setiap baris: [path utama, path cadangan kalau folder tidak ada].
      Urutan dipertahankan apa adanya dari versi Anda. */
+  /* Penanda versi memaksa browser dan CDN GitHub Pages mengambil berkas baru.
+     Tanpa ini, assets/app.js lama tetap disajikan dari cache sampai kedaluwarsa,
+     dan perubahan tidak terlihat walau sudah ter-push. Naikkan angka ini setiap
+     kali app.js atau app.css berubah. */
+  var V="3.4";
   var Q=[["data/config.js","config.js"],["data/indicators.js","indicators.js"],
          ["data/asumsi.js","asumsi.js"],["data/pemetaan.js","pemetaan.js"],
          ["assets/app.js","app.js"]];
@@ -85,13 +90,13 @@
 
   function one(c,done){var i=0;(function t(){
     if(i>=c.length){done(false);return;}
-    var s=document.createElement("script");s.src=c[i++];s.async=false;
+    var s=document.createElement("script");s.src=c[i++]+"?v="+V;s.async=false;
     s.onload=function(){found.push(s.src);done(true);};
     s.onerror=function(){s.parentNode&&s.parentNode.removeChild(s);t();};
     document.head.appendChild(s);})();}
 
   function next(n){ if(n>=Q.length){fin();return;}
-    one(Q[n],function(ok){ if(!ok) failed.push(Q[n][0].replace(/^.*\//,"")); next(n+1); }); }
+    one(Q[n],function(ok){ if(!ok) failed.push(Q[n][0].replace(/^.*\//,"").replace(/\?.*$/,"")); next(n+1); }); }
 
   /* Patch aksesibilitas dimuat SETELAH boot() berhasil, dan kegagalannya
      tidak fatal - dashboard tetap jalan tanpa file ini. */
