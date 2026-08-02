@@ -1,0 +1,240 @@
+/* =============================================================================
+   assets/overview.css  ·  v1.0
+   National Target Dashboard — tata letak Overview yang disetujui
+   -----------------------------------------------------------------------------
+   Pendamping assets/overview.js.
+
+   SEMUA kelas diawali wvo- dengan sengaja. Menaruh nama generik seperti .card,
+   .bar, atau .num ke halaman yang sudah memuat app.css akan bertabrakan dan
+   merusak sheet lain. Prefix ini membuat modul aman dimuat berdampingan.
+
+   Token app.css dipakai kalau ada, dengan nilai cadangan kalau tidak.
+   ============================================================================= */
+
+.wvo{
+  --wvo-orange: var(--orange, #FF5515);
+  --wvo-ink:    var(--midnight, #111222);
+  --wvo-green:  var(--green, #639922);
+  --wvo-amber:  var(--amber, #EF9F27);
+  --wvo-red:    var(--red, #E24B4A);
+  --wvo-teal:   var(--teal, #1D9E75);
+  --wvo-teal-d: #0F6E56;
+  --wvo-burnt:  var(--burnt, #D85A30);
+  --wvo-grey:   var(--grey, #6E6C7A);
+  --wvo-grey-d: #5E5C6A;
+  --wvo-rule:   #E4E4EA;
+  --wvo-rule-s: #C9C8D2;
+  --wvo-tint:   #F2F2F5;
+  --wvo-card:   #FFFFFF;
+  --wvo-gbg:    #EAF3DE;
+  --wvo-abg:    #FAEEDA;
+  --wvo-rbg:    #FCEBEB;
+  --wvo-micro:  11px;
+  --wvo-small:  12px;
+
+  font-size: 13px;
+  color: var(--wvo-ink);
+}
+.wvo *{ box-sizing: border-box; }
+
+/* ---------- filter ---------- */
+.wvo-bar{ display:flex; flex-wrap:wrap; gap:7px; align-items:center; margin:0 0 18px; }
+.wvo-chip{
+  border:.5px solid var(--wvo-rule-s); background:var(--wvo-card);
+  border-radius:999px; padding:5px 12px;
+  font:inherit; font-size:var(--wvo-small); color:var(--wvo-grey-d); cursor:pointer;
+}
+.wvo-chip:hover{ background:var(--wvo-tint); }
+.wvo-chip[aria-pressed="true"]{
+  background:var(--wvo-ink); color:#fff; border-color:var(--wvo-ink);
+}
+.wvo-chip:focus-visible{ outline:2px solid var(--wvo-orange); outline-offset:2px; }
+.wvo-sel{
+  font:inherit; font-size:var(--wvo-small); padding:5px 9px;
+  border:.5px solid var(--wvo-rule-s); border-radius:var(--radius, 8px);
+  background:var(--wvo-card); color:var(--wvo-grey-d);
+}
+.wvo-count{ margin-left:auto; font-size:var(--wvo-small); color:var(--wvo-grey); }
+
+/* ---------- kpi ---------- */
+.wvo-strip{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:12px; margin-bottom:16px;
+}
+.wvo-kpi{
+  background:var(--wvo-card); border:.5px solid var(--wvo-rule);
+  border-radius:var(--radius, 8px); padding:12px 14px;
+}
+.wvo-kpi span{ display:block; font-size:var(--wvo-micro); color:var(--wvo-grey); margin-bottom:3px; }
+.wvo-kpi b{ font-size:21px; font-weight:600; font-variant-numeric:tabular-nums; }
+
+/* ---------- kartu ---------- */
+.wvo-card{
+  background:var(--wvo-card); border:.5px solid var(--wvo-rule);
+  border-radius:12px; padding:16px 20px; margin-bottom:16px;
+}
+.wvo-card h3{ font-size:15px; font-weight:600; margin:0 0 2px; }
+.wvo-sub{ font-size:var(--wvo-small); color:var(--wvo-grey); margin:0 0 14px; }
+.wvo-leg{
+  display:flex; flex-wrap:wrap; gap:8px 16px;
+  font-size:var(--wvo-micro); color:var(--wvo-grey); margin:0 0 12px;
+}
+.wvo-leg span{ display:flex; align-items:center; gap:6px; }
+.wvo-sw{ width:14px; height:9px; border-radius:2px; }
+.wvo-rng{ width:11px; height:11px; border-radius:50%; border:2px solid var(--wvo-teal); background:#fff; box-sizing:border-box; }
+.wvo-fil{ width:11px; height:11px; border-radius:50%; background:var(--wvo-teal-d); }
+
+/* ---------- label : kiri, wrap dua baris, TANPA ellipsis ----------
+   Versi lama memakai text-align:right bersama overflow:hidden dan
+   text-overflow:ellipsis. Teks meluber ke kiri lalu dipotong, sementara "..."
+   menempel di kanan — itu yang membuat "OIOS 96" terbaca "OS 96". */
+.wvo-lab{
+  position:relative; text-align:left;
+  font-size:var(--wvo-small); line-height:1.4;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.wvo-pol{ font-size:var(--wvo-micro); color:var(--wvo-grey); }
+.wvo-lab::after{
+  content:attr(data-tip); position:absolute; left:0; bottom:calc(100% + 6px); z-index:40;
+  width:max-content; max-width:300px; padding:7px 10px;
+  background:var(--wvo-ink); color:#fff; border-radius:6px;
+  font-size:var(--wvo-micro); line-height:1.45; white-space:normal;
+  opacity:0; visibility:hidden; transition:opacity .12s; pointer-events:none;
+}
+.wvo-lab:hover::after, .wvo-lab:focus::after{ opacity:1; visibility:visible; transition-delay:.25s; }
+.wvo-lab:focus-visible{ outline:2px solid var(--wvo-orange); outline-offset:2px; border-radius:3px; }
+
+/* ---------- bullet ---------- */
+.wvo-brow{
+  display:grid; grid-template-columns:250px minmax(0,1fr) 128px;
+  align-items:center; gap:16px; padding:13px 0; border-top:.5px solid var(--wvo-rule);
+}
+.wvo-tr{ position:relative; height:18px; background:var(--wvo-tint); border-radius:3px; }
+.wvo-zn{ position:absolute; top:0; bottom:0; background:var(--wvo-gbg); border-radius:2px; }
+.wvo-fill{
+  position:absolute; left:0; top:0; bottom:0; min-width:3px;
+  border-radius:0 3px 3px 0; width:0;
+  transition:width .8s cubic-bezier(.22,.8,.3,1);
+}
+.wvo-ovr{
+  position:absolute; top:0; bottom:0; width:0; border-radius:0 3px 3px 0;
+  transition:width .8s cubic-bezier(.22,.8,.3,1);
+}
+.wvo-tk{
+  position:absolute; top:-5px; bottom:-5px; width:2px; margin-left:-1px;
+  background:var(--wvo-ink); border-radius:1px;
+}
+.wvo-na{
+  position:absolute; inset:0; border-radius:3px; border:.5px solid var(--wvo-rule-s);
+  background:repeating-linear-gradient(45deg, var(--wvo-tint) 0 4px, transparent 4px 8px);
+}
+.wvo-num{
+  font-size:var(--wvo-small); text-align:right; color:var(--wvo-grey-d);
+  font-variant-numeric:tabular-nums;
+}
+.wvo-dim{ color:var(--wvo-grey); }
+.wvo-ok{ background:var(--wvo-green); }
+.wvo-wn{ background:var(--wvo-amber); }
+.wvo-bd{ background:var(--wvo-red); }
+
+/* ---------- dumbbell ---------- */
+.wvo-drow{
+  display:grid; grid-template-columns:250px minmax(0,1fr) 124px 24px;
+  align-items:center; gap:16px; padding:12px 0; border-top:.5px solid var(--wvo-rule);
+}
+.wvo-dtr{ position:relative; height:22px; }
+.wvo-rail{ position:absolute; left:0; right:0; top:10px; height:2px; background:var(--wvo-tint); }
+.wvo-gtk{ position:absolute; top:3px; bottom:3px; width:1px; background:var(--wvo-rule); }
+.wvo-conn{
+  position:absolute; top:10px; height:2px; background:#5DCAA5;
+  left:var(--a); width:0;
+  transition:left .75s cubic-bezier(.22,.8,.3,1), width .75s cubic-bezier(.22,.8,.3,1);
+}
+.wvo-dot{
+  position:absolute; top:5.5px; width:12px; height:12px; border-radius:50%;
+  margin-left:-6px; box-sizing:border-box;
+}
+.wvo-d1{ border:2px solid var(--wvo-teal); background:#fff; left:var(--a); }
+.wvo-d2{ background:var(--wvo-teal-d); left:var(--a); transition:left .75s cubic-bezier(.22,.8,.3,1); }
+.wvo-dir{ font-size:13px; text-align:center; line-height:1; }
+.wvo-up{ color:var(--wvo-teal-d); }
+.wvo-dn{ color:var(--wvo-burnt); }
+.wvo-fl{ color:var(--wvo-grey); }
+
+/* ---------- delta ---------- */
+.wvo-erow{
+  display:grid; grid-template-columns:250px 104px minmax(0,1fr) 96px 78px;
+  align-items:center; gap:14px; padding:12px 0; border-top:.5px solid var(--wvo-rule);
+}
+.wvo-et{ position:relative; height:9px; background:var(--wvo-tint); border-radius:5px; }
+.wvo-ef{
+  position:absolute; top:0; bottom:0; border-radius:5px; width:0;
+  transition:width .8s cubic-bezier(.22,.8,.3,1);
+}
+.wvo-pill{
+  display:inline-block; font-size:var(--wvo-micro); padding:2px 8px;
+  border-radius:999px; font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+.wvo-p-ok{ background:var(--wvo-gbg); color:#173404; }
+.wvo-p-wn{ background:var(--wvo-abg); color:#412402; }
+.wvo-p-bd{ background:var(--wvo-rbg); color:#501313; }
+.wvo-p-na{ background:var(--wvo-tint); color:var(--wvo-grey); }
+
+/* ---------- Top / Lowest berdampingan ---------- */
+.wvo-pair{ display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; }
+.wvo-lrow{
+  display:flex; align-items:center; gap:11px; padding:10px 0;
+  border-top:.5px solid var(--wvo-rule); font-size:var(--wvo-small);
+}
+.wvo-rk{ width:18px; color:var(--wvo-grey); font-variant-numeric:tabular-nums; }
+
+/* ---------- animasi ---------- */
+.wvo-go .wvo-fill{ width:var(--v); }
+.wvo-go .wvo-ovr{ width:var(--ov); }
+.wvo-go .wvo-conn{ left:var(--lo); width:var(--w); }
+.wvo-go .wvo-d2{ left:var(--b); }
+.wvo-go .wvo-ef{ width:var(--dw); }
+.wvo-hid{ display:none; }
+
+/* ---------- panel diagnosis ---------- */
+.wvo-fail{
+  border-left:4px solid var(--wvo-red); background:var(--wvo-rbg);
+  padding:14px 16px; border-radius:0; font-size:var(--wvo-small);
+  line-height:1.6; color:#4A2320; max-width:760px;
+}
+.wvo-fail b{ display:block; margin-bottom:6px; font-size:13px; }
+.wvo-fail code{
+  display:inline-block; margin:2px 3px 2px 0; padding:1px 5px;
+  background:#fff; border:1px solid #E3C9C6; border-radius:3px;
+  font-size:var(--wvo-micro);
+}
+
+@media (max-width:980px){
+  .wvo-brow{ grid-template-columns:180px minmax(0,1fr) 112px; }
+  .wvo-drow{ grid-template-columns:180px minmax(0,1fr) 112px 22px; }
+  .wvo-erow{ grid-template-columns:180px 92px minmax(0,1fr) 74px; }
+  .wvo-erow .wvo-pill{ display:none; }
+}
+
+@media print{
+  .wvo-bar{ display:none !important; }
+  .wvo-card{ break-inside:avoid; border-color:#000; }
+  .wvo-lab::after{ display:none !important; }
+  .wvo-lab{ -webkit-line-clamp:3; }
+  .wvo-fill, .wvo-ovr, .wvo-conn, .wvo-d2, .wvo-ef{ transition:none !important; }
+  .wvo-fill{ width:var(--v) !important; print-color-adjust:exact; -webkit-print-color-adjust:exact; border:.5px solid #000; }
+  .wvo-ovr{ width:var(--ov) !important; }
+  .wvo-conn{ left:var(--lo) !important; width:var(--w) !important; }
+  .wvo-d2{ left:var(--b) !important; background:#000; }
+  .wvo-d1{ border-color:#000; }
+  .wvo-ef{ width:var(--dw) !important; }
+  .wvo-ok{ background:#fff; }
+  .wvo-wn{ background:repeating-linear-gradient(45deg,#000 0 1px,#fff 1px 4px); }
+  .wvo-bd{ background:repeating-linear-gradient(90deg,#000 0 1px,#fff 1px 3px); }
+  .wvo-zn{ background:#F4F4F4; print-color-adjust:exact; }
+  .wvo-num{ color:#000 !important; }
+}
+
+@media (prefers-reduced-motion:reduce){
+  .wvo-fill, .wvo-ovr, .wvo-conn, .wvo-d2, .wvo-ef, .wvo-lab::after{ transition:none; }
+}
