@@ -392,14 +392,6 @@ const th = (label,key,cls) => '<th class="'+(cls||"")+(F.sort===key?" sorted":""
 function renderSummary(){
   const rows=filtered();
 
-  /* G4 · rata-rata baseline vs threshold per indikator */
-  const g4=S.cat.map(c=>{
-    const rs=rows.filter(r=>r.Indicator===c.ind);
-    return {label:c.short,
-      a:avg(rs.map(r=>N(r.Pct_Base)).filter(v=>v>0)),
-      b:avg(rs.map(r=>N(r.Threshold)).filter(v=>v>0))};
-  }).filter(x=>x.a!=null||x.b!=null);
-
   const COLS=[["Zonal","Zonal"],["Area Program","Area Program"],["Outcome","Outcome"],["Code","Code"],
     ["Indicator","Indikator"],["Num_Base","Num Base"],["Den_Base","Den Base"],["Pct_Base","% Baseline"],
     ["Num_LOP","Num LOP"],["Den_LOP","Den LOP"],["Pct_LOP","% LOP"],["Delta","Delta"],
@@ -408,14 +400,6 @@ function renderSummary(){
   const cap=F.showAll?view.length:Math.min(view.length,150);
 
   return filterBand(false)+
-
-  '<div style="margin-top:18px">'+
-    '<div><div class="slabel" style="margin-top:0">Baseline vs Threshold per indikator</div>'+
-      '<div class="chartbox">'+chartPair(g4,["Baseline",CLR.baseline],["Threshold",CLR.threshold],{labW:250})+
-        legend([["Rata-rata Baseline",CLR.baseline],["Threshold",CLR.threshold]])+
-        '<p class="chartnote">Rata-rata antar Area Program, hanya baris dengan nilai &gt; 0. '+
-        'Bersifat indikatif, bukan angka nasional resmi.</p></div></div>'+
-  '</div>'+
 
 
 
@@ -1491,12 +1475,18 @@ function chHBar(items){
        '<text x="'+x+'" y="'+(H-4)+'" text-anchor="middle" font-size="9.5" fill="'+CL.ink4+'">'+(g*25)+'%</text>';}
   items.forEach((it,i)=>{
     const y=i*P+12;
-    s+=svgWrap(it.label,0,y+BH+1,40,2,11.5,CL.ink);
     const wb=it.a==null?0:PW*Math.min(1,it.a), we=it.b==null?0:PW*Math.min(1,it.b);
-    s+='<rect x="'+LW+'" y="'+y+'" width="'+wb.toFixed(1)+'" height="'+BH+'" rx="3" fill="'+CL.blue+'" opacity=".85"/>'+
+    const tip=it.label+' \u00B7 Baseline '+(it.a==null?"belum ada data":pc0(it.a))+
+              ' \u00B7 Evaluation '+(it.b==null?"belum ada data":pc0(it.b));
+    s+='<g class="chr" style="--i:'+i+'" data-tip="'+esc(tip)+'">'+
+       '<rect class="chit" x="0" y="'+(y-8)+'" width="'+W+'" height="'+(P-2)+'"/>'+
+       '<rect class="ctrk" x="'+LW+'" y="'+y+'" width="'+PW+'" height="'+(BH*2+GAP)+'" rx="3"/>'+
+       svgWrap(it.label,0,y+BH+1,40,2,11.5,CL.ink)+
+       '<rect x="'+LW+'" y="'+y+'" width="'+wb.toFixed(1)+'" height="'+BH+'" rx="3" fill="'+CL.blue+'" opacity=".85"/>'+
        '<rect x="'+LW+'" y="'+(y+BH+GAP)+'" width="'+we.toFixed(1)+'" height="'+BH+'" rx="3" fill="'+CL.brand+'"/>'+
        '<text x="'+(LW+Math.max(wb,we)+9).toFixed(1)+'" y="'+(y+BH+2)+'" font-size="10.5" fill="'+CL.ink2+'">'+
-       (it.a==null?"—":pc0(it.a))+' → <tspan font-weight="600" fill="'+CL.ink+'">'+(it.b==null?"—":pc0(it.b))+'</tspan></text>';
+       (it.a==null?"\u2014":pc0(it.a))+' \u2192 <tspan font-weight="600" fill="'+CL.ink+'">'+(it.b==null?"\u2014":pc0(it.b))+'</tspan></text>'+
+       '</g>';
   });
   return s+'</svg>';
 }
@@ -1508,6 +1498,11 @@ function chBullet(items){
     s+='<text x="'+x+'" y="'+(H-4)+'" text-anchor="middle" font-size="9.5" fill="'+CL.ink4+'">'+(g*25)+'%</text>';}
   items.forEach((it,i)=>{
     const y=i*P+10;
+    const tip=it.label+' \u00B7 Evaluation '+(it.b==null?"belum ada data":pc0(it.b))+
+              (it.thr==null?"":' \u00B7 Threshold '+pc0(it.thr)+
+               ' \u00B7 '+(it.meets?"tercapai":"belum tercapai"));
+    s+='<g class="chr" style="--i:'+i+'" data-tip="'+esc(tip)+'">'+
+       '<rect class="chit" x="0" y="'+(y-6)+'" width="'+W+'" height="'+(P-2)+'"/>';
     s+=svgWrap(it.label,0,y+BH/2,40,2,11.5,CL.ink);
     s+='<rect x="'+LW+'" y="'+y+'" width="'+PW+'" height="'+BH+'" rx="3" fill="#F4F6F9"/>';
     if(it.thr!=null){
@@ -1528,7 +1523,8 @@ function chBullet(items){
          '" stroke="'+CL.ink+'" stroke-width="2"/>';
     }
     s+='<text x="'+(LW+PW+10)+'" y="'+(y+BH-3)+'" font-size="10.5" font-weight="600" fill="'+
-       (it.meets?CL.ok:it.b==null?CL.ink4:CL.bad)+'">'+(it.b==null?"—":pc0(it.b))+'</text>';
+       (it.meets?CL.ok:it.b==null?CL.ink4:CL.bad)+'">'+(it.b==null?"\u2014":pc0(it.b))+'</text>';
+    s+='</g>';
   });
   return s+'</svg>';
 }
@@ -1545,11 +1541,15 @@ function chDiverge(items){
   items.forEach((it,i)=>{
     const y=i*P+16, xv=x(it.v);
     const col=it.v>.001?CL.ok:it.v<-.001?CL.bad:CL.ink4;
-    s+=svgWrap(it.label,0,y+BH/2,40,2,11.5,CL.ink)+
+    const tip=it.label+' \u00B7 Delta '+((it.v>0?"+":"")+(it.v*100).toFixed(1))+' poin persentase';
+    s+='<g class="chr" style="--i:'+i+'" data-tip="'+esc(tip)+'">'+
+       '<rect class="chit" x="0" y="'+(y-8)+'" width="'+W+'" height="'+(P-2)+'"/>'+
+       svgWrap(it.label,0,y+BH/2,40,2,11.5,CL.ink)+
        '<rect x="'+Math.min(z,xv).toFixed(1)+'" y="'+y+'" width="'+Math.abs(xv-z).toFixed(1)+
        '" height="'+BH+'" rx="2" fill="'+col+'"/>'+
        '<text x="'+(LW+PW+10)+'" y="'+(y+BH-1)+'" font-size="10.5" font-weight="600" fill="'+col+'">'+
-       ((it.v>0?"+":"")+(it.v*100).toFixed(1))+'</text>';
+       ((it.v>0?"+":"")+(it.v*100).toFixed(1))+'</text>'+
+       '</g>';
   });
   return s+'</svg>';
 }
@@ -1718,6 +1718,11 @@ function renderDash(){
       chDonut(band, String(meets.length), "capai threshold"),
       "Indikator reduksi dihitung terbalik: makin rendah nilainya, makin tinggi capaiannya.")+'</div>'+
 
+    '<div class="c6">'+xcard("ocs","Outcome Summary","Jumlah indikator per outcome",
+      chDonut(ocSeg, String(per.length), "indikator"),
+      ocStat.length?'Capaian tertinggi <b>'+esc(ocStat[0].oc)+'</b>, terendah <b>'+
+        esc(ocStat[ocStat.length-1].oc)+'</b>.':'')+'</div>'+
+
     '<div class="c12">'+xcard("dlt","Delta per Indicator","Poin persentase, peningkatan terbesar di atas",
       chDiverge(withBoth.slice().sort((a,b)=>b.w.delta-a.w.delta)
         .map(x=>({label:(x.ind||x.short)+(x.dir===-1?" \u2193":""),v:x.w.delta}))),
@@ -1729,10 +1734,7 @@ function renderDash(){
     '<div class="c6">'+xcard("bot","Lowest Performing Indicators","Penurunan terbesar dibanding baseline",
       tbl(bot,"down"))+'</div>'+
 
-    '<div class="c6">'+xcard("ocs","Outcome Summary","Jumlah indikator per outcome",
-      chDonut(ocSeg, String(per.length), "indikator"),
-      ocStat.length?'Capaian tertinggi <b>'+esc(ocStat[0].oc)+'</b>, terendah <b>'+
-        esc(ocStat[ocStat.length-1].oc)+'</b>.':'')+'</div>'+
+    
 
     '<div class="c12">'+xcard("attn","Indicators Requiring Attention",
       attn.length+" indikator masih di bawah threshold",
@@ -1816,7 +1818,7 @@ function renderSettings(){
    ========================================================================== */
 const PAGES=[
  {id:"dashboard",   ic:"◫", nm:"Dashboard",   t:"National Target Dashboard", s:"Indonesia National Summary", r:renderDash},
- {id:"summary",     ic:"▤", nm:"Summary",     t:"All Indicators",            s:"Tabel lengkap seluruh baris",     r:()=>legacy(renderSummary)},
+ {id:"summary",     ic:"▤", nm:"List Indicator AP", t:"List Indicator AP",   s:"Tabel lengkap seluruh baris per Area Programme", r:()=>legacy(renderSummary)},
  {id:"reports",     ic:"⤓", nm:"Reports",     t:"Reports",                   s:"Unduhan dan cetak",              r:renderReports},
  {id:"settings",    ic:"⚙", nm:"Settings",    t:"Settings",                  s:"Sumber data dan pemeriksaan teknis", r:renderSettings}
 ];
@@ -1882,9 +1884,48 @@ function paint(){
 }
 const repaint=paint;
 
+/* ---------------- interaksi chart ----------------
+   Tooltip kustom, bukan atribut title= bawaan: title lambat muncul dan tidak
+   pernah jalan di perangkat sentuh. Satu elemen tooltip dipakai ulang untuk
+   semua chart, dipasang lewat delegasi di elemen svg. */
+let CHTIP=null;
+function chartInteract(){
+  if(!CHTIP){
+    CHTIP=document.createElement("div");
+    CHTIP.className="chtip"; CHTIP.setAttribute("role","status");
+    document.body.appendChild(CHTIP);
+  }
+  const hide=()=>CHTIP.classList.remove("on");
+  document.querySelectorAll("svg.ch").forEach(sv=>{
+    if(sv.dataset.wired) return;
+    sv.dataset.wired="1";
+    const show=e=>{
+      const g=e.target.closest?e.target.closest("g.chr"):null;
+      if(!g){ hide(); return; }
+      CHTIP.textContent=g.getAttribute("data-tip")||"";
+      CHTIP.classList.add("on");
+      const pad=14, w=CHTIP.offsetWidth, h=CHTIP.offsetHeight;
+      let x=e.clientX+pad, y=e.clientY-h-8;
+      if(x+w>window.innerWidth-8) x=e.clientX-w-pad;
+      if(y<8) y=e.clientY+pad;
+      CHTIP.style.left=x+"px"; CHTIP.style.top=y+"px";
+    };
+    sv.addEventListener("mousemove",show);
+    sv.addEventListener("mouseleave",hide);
+    sv.addEventListener("touchstart",ev=>{
+      const t=ev.touches[0];
+      show({target:document.elementFromPoint(t.clientX,t.clientY),
+            clientX:t.clientX, clientY:t.clientY});
+    },{passive:true});
+    sv.classList.add("chgo");
+  });
+  window.addEventListener("scroll",hide,{passive:true});
+}
+
 /* ---------------- wiring ---------------- */
 function wireAll(){
   const root=document.getElementById("pg");
+  chartInteract();
   document.querySelectorAll("[data-go]").forEach(a=>a.onclick=e=>{e.preventDefault();go(a.dataset.go);});
   document.querySelectorAll("[data-side]").forEach(b=>b.onclick=()=>{
     const s=document.getElementById("side");
