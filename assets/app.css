@@ -856,3 +856,52 @@ svg.ch{display:block;width:100%;height:auto;overflow:visible}
   .xc,.kpi,.legacy{box-shadow:none;break-inside:avoid}
   .page{padding:0}
 }
+
+/* =============================================================================
+   §10 · CHART INTERAKTIF  (v3.3)
+   -----------------------------------------------------------------------------
+   Baris chart bisa di-hover dan disentuh, dengan tooltip kustom. Atribut title=
+   bawaan tidak dipakai: lambat muncul dan tidak pernah jalan di perangkat sentuh.
+   ============================================================================= */
+
+/* pita sorot sepanjang baris */
+svg.ch g.chr .chit{ fill:transparent; }
+svg.ch g.chr:hover .chit{ fill:rgba(17,18,34,.045); }
+svg.ch g.chr .ctrk{ fill:#F4F6F9; }
+svg.ch g.chr{ cursor:default; }
+svg.ch g.chr:hover text{ fill:#111222; }
+
+/* animasi masuk, bertahap per baris. Hanya opacity dan translate supaya tidak
+   bergantung pada transform-box yang dukungannya tidak seragam di SVG. */
+svg.ch.chgo g.chr{
+  animation: chIn .34s cubic-bezier(.22,.8,.3,1) backwards;
+  animation-delay: calc(var(--i, 0) * 28ms);
+}
+@keyframes chIn{
+  from{ opacity:0; transform:translateX(-6px); }
+  to  { opacity:1; transform:translateX(0); }
+}
+
+/* tooltip */
+.chtip{
+  position:fixed; z-index:9999; left:0; top:0;
+  max-width:320px; padding:7px 10px;
+  background:#111222; color:#fff;
+  border-radius:6px;
+  font-size:12px; line-height:1.45;
+  pointer-events:none;
+  opacity:0; visibility:hidden;
+  transition:opacity .1s ease;
+  box-shadow:0 4px 16px rgba(17,18,34,.24);
+}
+.chtip.on{ opacity:1; visibility:visible; }
+
+@media print{
+  .chtip{ display:none !important; }
+  svg.ch.chgo g.chr{ animation:none; opacity:1; transform:none; }
+  svg.ch g.chr .ctrk{ fill:#F7F7F7; }
+}
+@media (prefers-reduced-motion:reduce){
+  svg.ch.chgo g.chr{ animation:none; }
+  .chtip{ transition:none; }
+}
