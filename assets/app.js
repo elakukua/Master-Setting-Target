@@ -1456,16 +1456,42 @@ function perInd(rows){
 }
 
 /* ---------------- grafik ---------------- */
+/* Label SVG dua baris, rata kiri.
+   Versi lama memakai text-anchor="end" di x = LW-12: teks memanjang ke KIRI
+   melewati batas viewBox lalu terpotong, sementara "..." yang sudah tertanam di
+   data/config.js menempel di kanan. Itu yang membuat "OIOS 96" terbaca "OS 96".
+   Sekarang teks penuh dipakai, dipatah maksimal dua baris, rata kiri. */
+function svgWrap(text,x,yMid,cw,maxLines,size,fill){
+  const words=String(text==null?"":text).replace(/\u2026/g,"").trim().split(/\s+/);
+  const lines=[]; let cur="", cut=false;
+  for(let i=0;i<words.length;i++){
+    const t=cur?cur+" "+words[i]:words[i];
+    if(t.length<=cw){ cur=t; continue; }
+    if(lines.length<maxLines-1){ lines.push(cur); cur=words[i]; }
+    else { cut=true; break; }
+  }
+  if(cur) lines.push(cur);
+  if(cut){
+    const L=lines.length-1;
+    lines[L]=lines[L].slice(0,Math.max(1,cw-1)).replace(/\s+\S*$/,"")+"\u2026";
+  }
+  const lh=size+1.5, y0=yMid-(lines.length-1)*lh/2+size*0.34;
+  let o='<text x="'+x+'" y="'+y0.toFixed(1)+'" font-size="'+size+'" fill="'+fill+'">';
+  for(let i=0;i<lines.length;i++){
+    o+='<tspan x="'+x+'"'+(i?' dy="'+lh+'"':'')+'>'+esc(lines[i])+'</tspan>';
+  }
+  return o+'</text>';
+}
 function chHBar(items){
   if(!items.length) return '<div class="xempty">Tidak ada indikator pada filter ini.</div>';
-  const W=680,LW=228,BH=8,GAP=3,P=BH*2+GAP+18,H=items.length*P+22,PW=W-LW-62;
+  const W=680,LW=252,BH=8,GAP=3,P=BH*2+GAP+22,H=items.length*P+22,PW=W-LW-62;
   let s='<svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img"><title>Baseline vs Evaluation</title>';
   for(let g=0;g<=4;g++){const x=LW+PW*g/4;
     s+='<line x1="'+x+'" y1="6" x2="'+x+'" y2="'+(H-16)+'" stroke="'+CL.ln2+'"/>'+
        '<text x="'+x+'" y="'+(H-4)+'" text-anchor="middle" font-size="9.5" fill="'+CL.ink4+'">'+(g*25)+'%</text>';}
   items.forEach((it,i)=>{
     const y=i*P+12;
-    s+='<text x="'+(LW-12)+'" y="'+(y+9)+'" text-anchor="end" font-size="11.5" fill="'+CL.ink+'">'+esc(it.label)+'</text>';
+    s+=svgWrap(it.label,0,y+BH+1,40,2,11.5,CL.ink);
     const wb=it.a==null?0:PW*Math.min(1,it.a), we=it.b==null?0:PW*Math.min(1,it.b);
     s+='<rect x="'+LW+'" y="'+y+'" width="'+wb.toFixed(1)+'" height="'+BH+'" rx="3" fill="'+CL.blue+'" opacity=".85"/>'+
        '<rect x="'+LW+'" y="'+(y+BH+GAP)+'" width="'+we.toFixed(1)+'" height="'+BH+'" rx="3" fill="'+CL.brand+'"/>'+
@@ -1476,13 +1502,13 @@ function chHBar(items){
 }
 function chBullet(items){
   if(!items.length) return '<div class="xempty">Tidak ada indikator dengan threshold pada filter ini.</div>';
-  const W=680,LW=228,BH=14,P=BH+16,H=items.length*P+22,PW=W-LW-66;
+  const W=680,LW=252,BH=16,P=BH+22,H=items.length*P+22,PW=W-LW-66;
   let s='<svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img"><title>Baseline vs Threshold, bullet chart</title>';
   for(let g=0;g<=4;g++){const x=LW+PW*g/4;
     s+='<text x="'+x+'" y="'+(H-4)+'" text-anchor="middle" font-size="9.5" fill="'+CL.ink4+'">'+(g*25)+'%</text>';}
   items.forEach((it,i)=>{
     const y=i*P+10;
-    s+='<text x="'+(LW-12)+'" y="'+(y+BH-3)+'" text-anchor="end" font-size="11.5" fill="'+CL.ink+'">'+esc(it.label)+'</text>';
+    s+=svgWrap(it.label,0,y+BH/2,40,2,11.5,CL.ink);
     s+='<rect x="'+LW+'" y="'+y+'" width="'+PW+'" height="'+BH+'" rx="3" fill="#F4F6F9"/>';
     if(it.thr!=null){
       const wt=PW*Math.min(1,it.thr);
@@ -1508,7 +1534,7 @@ function chBullet(items){
 }
 function chDiverge(items){
   if(!items.length) return '<div class="xempty">Belum ada indikator dengan baseline dan evaluation.</div>';
-  const W=680,LW=228,BH=10,P=BH+11,H=items.length*P+26,PW=W-LW-72;
+  const W=680,LW=252,BH=10,P=BH+20,H=items.length*P+26,PW=W-LW-72;
   const m=Math.max(.02,...items.map(i=>Math.abs(i.v||0))), sc=Math.ceil(m*20)/20;
   const z=LW+PW/2, half=PW/2, x=v=>z+half*Math.max(-1,Math.min(1,(v||0)/sc));
   let s='<svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img"><title>Delta per indikator</title>';
@@ -1519,7 +1545,7 @@ function chDiverge(items){
   items.forEach((it,i)=>{
     const y=i*P+16, xv=x(it.v);
     const col=it.v>.001?CL.ok:it.v<-.001?CL.bad:CL.ink4;
-    s+='<text x="'+(LW-12)+'" y="'+(y+BH-1)+'" text-anchor="end" font-size="11.5" fill="'+CL.ink+'">'+esc(it.label)+'</text>'+
+    s+=svgWrap(it.label,0,y+BH/2,40,2,11.5,CL.ink)+
        '<rect x="'+Math.min(z,xv).toFixed(1)+'" y="'+y+'" width="'+Math.abs(xv-z).toFixed(1)+
        '" height="'+BH+'" rx="2" fill="'+col+'"/>'+
        '<text x="'+(LW+PW+10)+'" y="'+(y+BH-1)+'" font-size="10.5" font-weight="600" fill="'+col+'">'+
@@ -1674,35 +1700,17 @@ function renderDash(){
   '<div class="grid">'+
     '<div class="c8">'+xcard("cmp","Baseline vs Evaluation",
       "Weighted National — Σ Numerator ÷ Σ Denominator, per indikator",
-      chHBar(per.map(x=>({label:x.short+(x.dir===-1?" ↓":""),
+      chHBar(per.map(x=>({label:(x.ind||x.short)+(x.dir===-1?" \u2193":""),
         a:F.period!=="Evaluation"?x.w.pB:null, b:F.period!=="Baseline"?x.w.pE:null}))),
       '<span style="display:inline-flex;gap:16px"><span><i style="display:inline-block;width:9px;height:9px;'+
       'border-radius:2px;background:'+CL.blue+'"></i> Baseline FY26</span>'+
       '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+CL.brand+
       '"></i> Evaluation FY30</span><span>↓ indikator reduksi — penurunan berarti perbaikan</span></span>')+'</div>'+
 
-    '<div class="c4">'+xcard("ins","Executive Insights","Mengikuti filter di atas",
-      '<div class="ins">'+[
-        ['t-ok','✓','<b>'+meets.length+' dari '+per.filter(x=>x.meets!==null).length+
-          '</b> indikator sudah mencapai threshold.'],
-        ['t-blue','◈',ocStat.length?'Outcome dengan capaian tertinggi: <b>'+esc(ocStat[0].oc)+
-          '</b> (median '+pc0(ocStat[0].med)+' dari threshold).':'Belum ada outcome yang bisa dinilai.'],
-        ['t-warn','◈',ocStat.length>1?'Outcome terlemah: <b>'+esc(ocStat[ocStat.length-1].oc)+
-          '</b> (median '+pc0(ocStat[ocStat.length-1].med)+').':'&nbsp;'],
-        ['t-bad','↓','<b>'+turun.length+'</b> indikator menurun dibanding baseline, <b>'+naik.length+
-          '</b> meningkat.'],
-        ['t-ok','◎',apStat.length?'AP terbaik: <b>'+esc(apStat[0].ap)+'</b> ('+apStat[0].ok+' dari '+
-          apStat[0].m+' indikator di atas threshold).':'&nbsp;'],
-        ['t-bad','◎',apStat.length>1?'AP perlu perhatian: <b>'+esc(apStat[apStat.length-1].ap)+
-          '</b> ('+apStat[apStat.length-1].ok+' dari '+apStat[apStat.length-1].m+').':'&nbsp;'],
-        ['t-gray','▦',medAch!==null?'Median capaian nasional terhadap threshold: <b>'+pc0(medAch)+'</b>.':'&nbsp;']
-      ].filter(x=>x[2]!=="&nbsp;").map(x=>'<div class="ins-i"><span class="ins-d '+x[0]+'">'+x[1]+
-        '</span><div class="ins-t">'+x[2]+'</div></div>').join('')+'</div>')+'</div>'+
-
-    '<div class="c6">'+xcard("bul","Evaluation vs Threshold",
+    '<div class="c12">'+xcard("bul","Evaluation vs Threshold",
       "Bullet chart — batang gelap = threshold, titik = baseline",
       chBullet(per.filter(x=>x.thr!=null).sort((a,b)=>(a.ach||0)-(b.ach||0))
-        .map(x=>({label:x.short+(x.dir===-1?" ↓":""),a:x.w.pB,b:x.w.pE,thr:x.thr,meets:x.meets}))),
+        .map(x=>({label:(x.ind||x.short)+(x.dir===-1?" \u2193":""),a:x.w.pB,b:x.w.pE,thr:x.thr,meets:x.meets}))),
       "Diurutkan dari capaian terendah. Hijau berarti threshold tercapai.")+'</div>'+
 
     '<div class="c6">'+xcard("perf","Performance Summary",
@@ -1710,21 +1718,21 @@ function renderDash(){
       chDonut(band, String(meets.length), "capai threshold"),
       "Indikator reduksi dihitung terbalik: makin rendah nilainya, makin tinggi capaiannya.")+'</div>'+
 
-    '<div class="c6">'+xcard("dlt","Delta per Indicator","Poin persentase, peningkatan terbesar di atas",
+    '<div class="c12">'+xcard("dlt","Delta per Indicator","Poin persentase, peningkatan terbesar di atas",
       chDiverge(withBoth.slice().sort((a,b)=>b.w.delta-a.w.delta)
-        .map(x=>({label:x.short+(x.dir===-1?" ↓":""),v:x.w.delta}))),
+        .map(x=>({label:(x.ind||x.short)+(x.dir===-1?" \u2193":""),v:x.w.delta}))),
       (top.length?'Top improvement: <b style="color:'+CL.ok+'">'+esc(top[0].short)+' '+ppv(top[0].w.delta)+
         '</b> &nbsp;·&nbsp; Bottom: <b style="color:'+CL.bad+'">'+esc(bot[0].short)+' '+ppv(bot[0].w.delta)+'</b>':''))+'</div>'+
-
-    '<div class="c6">'+xcard("ocs","Outcome Summary","Jumlah indikator per outcome",
-      chDonut(ocSeg, String(per.length), "indikator"),
-      ocStat.length?'Capaian tertinggi <b>'+esc(ocStat[0].oc)+'</b>, terendah <b>'+
-        esc(ocStat[ocStat.length-1].oc)+'</b>.':'')+'</div>'+
 
     '<div class="c6">'+xcard("top","Top Performing Indicators","Peningkatan terbesar dibanding baseline",
       tbl(top,"up"))+'</div>'+
     '<div class="c6">'+xcard("bot","Lowest Performing Indicators","Penurunan terbesar dibanding baseline",
       tbl(bot,"down"))+'</div>'+
+
+    '<div class="c6">'+xcard("ocs","Outcome Summary","Jumlah indikator per outcome",
+      chDonut(ocSeg, String(per.length), "indikator"),
+      ocStat.length?'Capaian tertinggi <b>'+esc(ocStat[0].oc)+'</b>, terendah <b>'+
+        esc(ocStat[ocStat.length-1].oc)+'</b>.':'')+'</div>'+
 
     '<div class="c12">'+xcard("attn","Indicators Requiring Attention",
       attn.length+" indikator masih di bawah threshold",
@@ -1809,9 +1817,6 @@ function renderSettings(){
 const PAGES=[
  {id:"dashboard",   ic:"◫", nm:"Dashboard",   t:"National Target Dashboard", s:"Indonesia National Summary", r:renderDash},
  {id:"summary",     ic:"▤", nm:"Summary",     t:"All Indicators",            s:"Tabel lengkap seluruh baris",     r:()=>legacy(renderSummary)},
- {id:"analysis",    ic:"◪", nm:"Analysis",    t:"Analysis by Area Programme",s:"Baseline versus endline per AP",  r:()=>legacy(renderAnalisis)},
- {id:"mapping",     ic:"⊞", nm:"Mapping",     t:"Indicator Mapping",         s:"Matriks indikator × Area Programme", r:()=>legacy(renderPemetaan)},
- {id:"assumptions", ic:"◇", nm:"Assumptions", t:"Indicator Assumptions",     s:"Arah dan target delta per indikator", r:()=>legacy(renderAsumsi)},
  {id:"reports",     ic:"⤓", nm:"Reports",     t:"Reports",                   s:"Unduhan dan cetak",              r:renderReports},
  {id:"settings",    ic:"⚙", nm:"Settings",    t:"Settings",                  s:"Sumber data dan pemeriksaan teknis", r:renderSettings}
 ];
