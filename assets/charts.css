@@ -1,0 +1,381 @@
+/* =============================================================================
+   assets/charts.css  ·  v2.0  (final)
+   AIM+ AP Target Setting — Decision Workbook · Wahana Visi Indonesia
+   -----------------------------------------------------------------------------
+   Pendamping assets/charts.js. Dimuat SETELAH assets/app.css.
+
+   Memakai token warna yang sudah ada:
+     --teal, --green, --amber, --red, --burnt, --grey, --midnight, --orange
+   ditambah --rule-soft dan --grey-deep dari a11y-patch.css. Semua punya nilai
+   cadangan, jadi file ini tetap benar walau dimuat sendirian.
+
+   Catatan soal merah. Di dumbbell merah TIDAK dipakai — di sana ia akan berarti
+   "memburuk" dan menabrak status critical pada 5 status vocabulary; --burnt yang
+   dipakai. Di bullet merah SAH dipakai, karena di sana ia berarti gap kritis
+   terhadap ambang batas, makna yang sama dengan critical.
+
+   §1  DUMBBELL   Baseline -> Evaluasi
+   §2  BULLET     Capaian vs ambang batas
+   ============================================================================= */
+
+
+/* =============================================================================
+   §1 · DUMBBELL
+   ============================================================================= */
+
+.dmb{ font-size: 12px; }
+
+/* --- legenda --- */
+.dmb-leg{
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px 18px;
+  margin: 0 0 12px;
+  font-size: 11px;
+  color: var(--grey, #6E6C7A);
+}
+.dmb-leg span{ display: flex; align-items: center; gap: 6px; }
+.dmb-leg-note{ font-style: normal; }
+
+.dmb-k-base, .dmb-k-eval{
+  display: inline-block; width: 11px; height: 11px;
+  border-radius: 50%; box-sizing: border-box;
+}
+.dmb-k-base{ border: 2px solid var(--teal, #1D9E75); background: #fff; }
+.dmb-k-eval{ background: var(--teal-deep, #0F6E56); }
+
+/* --- baris --- */
+.dmb-row{
+  display: grid;
+  grid-template-columns: 172px minmax(0, 1fr) 104px 22px;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 0.5px solid var(--rule-soft, #C9C8D2);
+}
+
+/* --- label: wrap dua baris, tanpa truncate, tanpa title= --- */
+.dmb-lab{
+  position: relative;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--midnight, #111222);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dmb-lab::after{
+  content: attr(data-tip);
+  position: absolute;
+  left: 0; bottom: calc(100% + 6px);
+  z-index: 40;
+  width: max-content; max-width: 250px;
+  padding: 6px 9px;
+  background: var(--midnight, #111222);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  opacity: 0; visibility: hidden;
+  transition: opacity .12s ease;
+  pointer-events: none;
+}
+.dmb-lab:hover::after,
+.dmb-lab:focus::after,
+.dmb-lab:focus-visible::after{
+  opacity: 1; visibility: visible;
+  transition-delay: .3s;
+}
+.dmb-lab:focus-visible{
+  outline: 2px solid var(--orange, #FF5515);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* --- track --- */
+.dmb-track{ position: relative; height: 22px; }
+
+.dmb-rail{
+  position: absolute; left: 0; right: 0; top: 10px;
+  height: 2px;
+  background: #ECECF1;
+  border-radius: 1px;
+}
+.dmb-tick{
+  position: absolute; top: 3px; bottom: 3px;
+  width: 1px;
+  background: var(--rule-soft, #C9C8D2);
+}
+
+.dmb-conn{
+  position: absolute; top: 10px; height: 2px;
+  background: #5DCAA5;
+  left: var(--a); width: 0;
+  transition: left .75s cubic-bezier(.22,.8,.3,1),
+              width .75s cubic-bezier(.22,.8,.3,1);
+}
+
+.dmb-dot{
+  position: absolute; top: 5.5px;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  margin-left: -5.5px;
+  box-sizing: border-box;
+}
+/* Cincin kosong vs terisi — bukan hanya dua gradasi warna. Ini yang membuat
+   chart tetap terbaca saat dicetak hitam-putih dan untuk pembaca deuteranopia. */
+.dmb-base{
+  left: var(--a);
+  border: 2px solid var(--teal, #1D9E75);
+  background: #fff;
+}
+.dmb-eval{
+  left: var(--a);
+  background: var(--teal-deep, #0F6E56);
+  transition: left .75s cubic-bezier(.22,.8,.3,1);
+}
+
+/* Kelas dmb-go ditambahkan oleh WVIChart.animate() setelah markup masuk DOM.
+   Tanpa kelas ini chart tampil di posisi baseline; dengan kelas ini titik
+   evaluasi dan garis penghubung bergeser ke posisi final. */
+.dmb-go .dmb-conn{ left: var(--lo); width: var(--w); }
+.dmb-go .dmb-eval{ left: var(--b); }
+
+/* --- angka dan arah --- */
+.dmb-val{
+  font-size: 12px;
+  text-align: right;
+  color: var(--grey-deep, #5E5C6A);
+  font-variant-numeric: tabular-nums;
+}
+.dmb-na{ color: var(--grey, #6E6C7A); letter-spacing: .3px; }
+
+.dmb-dir{
+  font-size: 13px;
+  line-height: 1;
+  text-align: center;
+}
+.dmb-up   { color: var(--teal-deep, #0F6E56); }
+.dmb-down { color: var(--burnt,     #D85A30); }
+.dmb-flat { color: var(--grey,      #6E6C7A); }
+
+/* --- data belum tersedia --- */
+.dmb-hatch{
+  position: absolute; left: 0; right: 0; top: 8px;
+  height: 6px;
+  border-radius: 3px;
+  border: 0.5px solid var(--rule-soft, #C9C8D2);
+  background: repeating-linear-gradient(
+      45deg,
+      #ECECF1 0 4px,
+      transparent 4px 8px);
+}
+
+/* --- layar sempit --- */
+@media (max-width: 720px){
+  .dmb-row{ grid-template-columns: 130px minmax(0, 1fr) 92px 20px; gap: 8px; }
+}
+
+/* --- cetak: A4 landscape, ikut §9 --- */
+@media print{
+  .dmb-conn{ transition: none; left: var(--lo) !important; width: var(--w) !important; }
+  .dmb-eval{ transition: none; left: var(--b)  !important; }
+  .dmb-lab::after{ display: none !important; }
+  .dmb-lab{ -webkit-line-clamp: 3; }
+  .dmb-row{ padding: 6px 0; break-inside: avoid; }
+  .dmb-base{ border-color: #000; }
+  .dmb-eval{ background: #000; }
+  .dmb-conn{ background: #888; }
+  .dmb-val, .dmb-dir{ color: #000 !important; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .dmb-conn, .dmb-eval{ transition: none; }
+  .dmb-lab::after{ transition: none; }
+}
+
+/* =============================================================================
+   §2 · BULLET
+   ============================================================================= */
+
+.blt{ font-size: 12px; }
+
+/* --- legenda --- */
+.blt-leg{
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px 16px;
+  margin: 0 0 12px;
+  font-size: 11px;
+  color: var(--grey, #6E6C7A);
+}
+.blt-leg span{ display: flex; align-items: center; gap: 6px; }
+
+.blt-k, .blt-k-zone{
+  display: inline-block; width: 14px; height: 9px;
+  border-radius: 2px; box-sizing: border-box;
+}
+.blt-k-zone{ background: #EAF3DE; border: 0.5px solid #C0DD97; }
+
+/* --- baris --- */
+.blt-row{
+  display: grid;
+  grid-template-columns: 166px minmax(0, 1fr) 118px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 0.5px solid var(--rule-soft, #C9C8D2);
+}
+
+/* --- label: wrap dua baris, tooltip CSS, tanpa title= --- */
+.blt-lab{
+  position: relative;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--midnight, #111222);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.blt-lab::after{
+  content: attr(data-tip);
+  position: absolute;
+  left: 0; bottom: calc(100% + 6px);
+  z-index: 40;
+  width: max-content; max-width: 250px;
+  padding: 6px 9px;
+  background: var(--midnight, #111222);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  opacity: 0; visibility: hidden;
+  transition: opacity .12s ease;
+  pointer-events: none;
+}
+.blt-lab:hover::after,
+.blt-lab:focus::after,
+.blt-lab:focus-visible::after{
+  opacity: 1; visibility: visible; transition-delay: .3s;
+}
+.blt-lab:focus-visible{
+  outline: 2px solid var(--orange, #FF5515);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* --- track --- */
+.blt-tr{
+  position: relative;
+  height: 14px;
+  background: #F2F2F5;
+  border-radius: 3px;
+}
+
+/* Zona baik. Inilah yang membuat indikator lower-is-better terbaca benar:
+   bar yang berakhir DI DALAM bayangan ini berarti bagus, di luar berarti
+   tidak — arah panjang bar tidak lagi jadi satu-satunya isyarat. */
+.blt-zone{
+  position: absolute; top: 0; bottom: 0;
+  background: #EAF3DE;
+  border-radius: 2px;
+}
+
+.blt-bar{
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 0;
+  min-width: 3px;                 /* nol hasil ukur tetap terlihat */
+  border-radius: 0 3px 3px 0;
+  transition: width .8s cubic-bezier(.22,.8,.3,1);
+}
+
+/* Bagian bar yang melewati ambang batas di arah yang salah. Dianyam supaya
+   terbaca sebagai kelebihan yang tidak seharusnya ada. */
+.blt-over{
+  position: absolute; top: 0; bottom: 0;
+  width: 0;
+  border-radius: 0 3px 3px 0;
+  transition: width .8s cubic-bezier(.22,.8,.3,1);
+}
+
+.blt-tick{
+  position: absolute; top: -4px; bottom: -4px;
+  width: 2px; margin-left: -1px;
+  background: var(--midnight, #111222);
+  border-radius: 1px;
+}
+.blt-tick-dim{ opacity: .35; }
+
+.blt-go .blt-bar  { width: var(--v);  }
+.blt-go .blt-over { width: var(--ov); }
+
+/* --- warna keparahan gap --- */
+.blt-ok   { background: var(--green, #639922); }
+.blt-warn { background: var(--amber, #EF9F27); }
+.blt-bad  { background: var(--red,   #E24B4A); }
+.blt-none { background: var(--grey,  #6E6C7A); }
+
+.blt-over.blt-ok  { background: repeating-linear-gradient(45deg, #3B6D11 0 3px, transparent 3px 6px); }
+.blt-over.blt-warn{ background: repeating-linear-gradient(45deg, #BA7517 0 3px, transparent 3px 6px); }
+.blt-over.blt-bad { background: repeating-linear-gradient(45deg, #A32D2D 0 3px, transparent 3px 6px); }
+
+/* --- angka --- */
+.blt-val{
+  font-size: 12px;
+  text-align: right;
+  color: var(--grey-deep, #5E5C6A);
+  font-variant-numeric: tabular-nums;
+}
+.blt-nav{ color: var(--grey, #6E6C7A); }
+
+/* Pengait baris tanpa data. Label diredupkan sedikit supaya baris TBC tidak
+   menarik perhatian sekuat baris yang punya angka. */
+.dmb-tbc .dmb-lab,
+.blt-tbc .blt-lab{ color: var(--grey-deep, #5E5C6A); }
+
+.blt-leg-note{ font-style: normal; }
+
+/* --- belum ada data --- */
+.blt-na{
+  position: absolute; inset: 0;
+  border-radius: 3px;
+  border: 0.5px solid var(--rule-soft, #C9C8D2);
+  background: repeating-linear-gradient(
+      45deg, #ECECF1 0 4px, transparent 4px 8px);
+}
+
+@media (max-width: 720px){
+  .blt-row{ grid-template-columns: 126px minmax(0, 1fr) 104px; gap: 8px; }
+}
+
+/* --- cetak: A4 landscape, ikut §9 -------------------------------------------
+   Hijau, amber, dan merah semuanya jadi abu-abu di printer hitam-putih, jadi
+   keparahan diberi pola isi yang berbeda. print-color-adjust: exact meminta
+   browser tidak membuang latar; opsi "Background graphics" pada dialog cetak
+   tetap harus aktif — sama seperti chart lain di workbook ini.
+--------------------------------------------------------------------------- */
+@media print{
+  .blt-bar, .blt-over{
+    transition: none;
+    width: var(--v) !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    border: 0.5px solid #000;
+  }
+  .blt-over{ width: var(--ov) !important; }
+  .blt-ok   { background: #fff; }
+  .blt-warn { background: repeating-linear-gradient(45deg, #000 0 1px, #fff 1px 4px); }
+  .blt-bad  { background: repeating-linear-gradient(90deg, #000 0 1px, #fff 1px 3px); }
+  .blt-zone { background: #F4F4F4; print-color-adjust: exact; }
+  .blt-lab::after{ display: none !important; }
+  .blt-lab{ -webkit-line-clamp: 3; }
+  .blt-row{ padding: 6px 0; break-inside: avoid; }
+  .blt-val{ color: #000 !important; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .blt-bar, .blt-over{ transition: none; }
+  .blt-lab::after{ transition: none; }
+}
