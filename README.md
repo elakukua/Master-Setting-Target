@@ -158,11 +158,11 @@ folder `data/` bisa dibaca langsung di GitHub tanpa melewati layar itu.
 
 ---
 
-Versi `v3.2` · 2 Agustus 2026 · data dari Master (9), pembaca CSV untuk pipeline Power Automate.
+Versi `v3.3` · 2 Agustus 2026 · data dari Master (9), pembaca CSV untuk pipeline Power Automate.
 
 ---
 
-## Struktur berkas (v3.2)
+## Struktur berkas (v3.3)
 
 ```
 index.html
@@ -195,6 +195,16 @@ log keputusan — tapi dashboard tidak membacanya.
 **Mengedit ketiga berkas itu tidak akan mengubah tampilan dashboard.** Perubahan
 harus diregenerasi ke `indicators.js` lewat sheet **Reports → Berkas untuk
 repository**, lalu berkas hasilnya di-commit ke `data/`.
+
+### Perubahan di v3.3
+
+- sheet `Summary` diganti nama jadi **List Indicator AP**
+- chart `Baseline vs Threshold per indikator` dihapus dari sheet itu
+- `Outcome Summary` disejajarkan berdampingan dengan `Performance Summary`
+- ketiga chart Dashboard jadi interaktif: sorot baris saat hover, tooltip kustom
+  berisi nama indikator penuh dan angkanya, animasi masuk bertahap. Atribut
+  `title=` bawaan tidak dipakai karena lambat dan tidak jalan di perangkat sentuh
+- `app.css` §10 ditambahkan untuk gaya interaksi chart
 
 ### Perubahan di v3.2
 
