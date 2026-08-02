@@ -864,10 +864,14 @@ svg.ch{display:block;width:100%;height:auto;overflow:visible}
    bawaan tidak dipakai: lambat muncul dan tidak pernah jalan di perangkat sentuh.
    ============================================================================= */
 
-/* pita sorot sepanjang baris */
-svg.ch g.chr .chit{ fill:transparent; }
+/* Pita sorot sepanjang baris.
+   fill dasar .chit dan .ctrk ditulis sebagai ATRIBUT di markup app.js, bukan di
+   sini. Nilai awal fill di SVG adalah hitam, jadi kalau berkas CSS ini gagal
+   termuat atau masih kena cache, mengandalkan CSS untuk menyembunyikan kotak
+   sorot akan menutupi seluruh baris chart dengan blok hitam. Di sini hanya
+   keadaan hover yang diatur, supaya kegagalan CSS paling buruk hanya
+   menghilangkan efek sorotnya. */
 svg.ch g.chr:hover .chit{ fill:rgba(17,18,34,.045); }
-svg.ch g.chr .ctrk{ fill:#F4F6F9; }
 svg.ch g.chr{ cursor:default; }
 svg.ch g.chr:hover text{ fill:#111222; }
 
